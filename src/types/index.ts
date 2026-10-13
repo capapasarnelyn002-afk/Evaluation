@@ -51,6 +51,7 @@ export interface EvaluationSubmission {
   id: string;
   activityId: string;
   formId?: string;
+  formSnapshot?: EvaluationForm;
   participantName: string;
   participantEmail: string;
   participantPhone?: string;
@@ -97,7 +98,10 @@ export type QuestionType =
   | 'multiple_choice'
   | 'dropdown'
   | 'short_text'
-  | 'long_text';
+  | 'long_text'
+  | 'number'
+  | 'date'
+  | 'email';
 
 export interface FormQuestion {
   id: string;

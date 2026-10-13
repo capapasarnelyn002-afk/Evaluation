@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { randomUUID } from 'node:crypto';
 
 dotenv.config();
 
@@ -48,6 +49,9 @@ interface ServerActivity {
 interface ServerEvaluation {
   id: string;
   activityId: string;
+  formId?: string;
+  formSnapshot?: any;
+  customAnswers?: Record<string, unknown>;
   participantName: string;
   participantEmail: string;
   participantPhone?: string;
@@ -642,6 +646,9 @@ app.post('/api/evaluations', (req, res) => {
   const newEval: ServerEvaluation = {
     id: `eval-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     activityId: payload.activityId,
+    formId: payload.formId,
+    formSnapshot: evaluationForms.find(form => form.id === payload.formId),
+    customAnswers: payload.customAnswers && typeof payload.customAnswers === 'object' ? payload.customAnswers : undefined,
     participantName: payload.participantName,
     participantEmail: payload.participantEmail,
     participantPhone: payload.participantPhone || '',
@@ -717,6 +724,9 @@ app.post('/api/sync', (req, res) => {
     const newEval: ServerEvaluation = {
       id: item.id || `eval-sync-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       activityId: item.activityId!,
+      formId: item.formId,
+      formSnapshot: item.formSnapshot || evaluationForms.find(form => form.id === item.formId),
+      customAnswers: item.customAnswers,
       participantName: item.participantName!,
       participantEmail: item.participantEmail!,
       participantPhone: item.participantPhone || '',
@@ -1384,6 +1394,86 @@ let evaluationForms: any[] = [
 ];
 
 // Forms endpoints
+const completedEvaluationImports = new Map<string, { form: any; activity: ServerActivity }>();
+
+app.post('/api/imports/evaluation', (req, res) => {
+  if (req.headers['x-user-role'] !== 'admin') {
+    return res.status(403).json({ error: 'Only an administrator can import evaluation activities.' });
+  }
+
+  const { requestId, title, formTitle, description, instructions, activityType, sections } = req.body || {};
+  if (typeof requestId !== 'string' || requestId.length < 8 || requestId.length > 100) {
+    return res.status(400).json({ error: 'A valid import request ID is required.' });
+  }
+  const priorResult = completedEvaluationImports.get(requestId);
+  if (priorResult) return res.json({ ...priorResult, replayed: true });
+  if (typeof title !== 'string' || !title.trim() || title.trim().length > 200 || (formTitle !== undefined && (typeof formTitle !== 'string' || !formTitle.trim() || formTitle.trim().length > 200))) {
+    return res.status(400).json({ error: 'A title between 1 and 200 characters is required.' });
+  }
+  if (!Array.isArray(sections) || sections.length === 0 || sections.length > 100) {
+    return res.status(400).json({ error: 'The evaluation needs between 1 and 100 sections.' });
+  }
+  const questionCount = sections.reduce((count: number, section: any) => count + (Array.isArray(section?.questions) ? section.questions.length : 0), 0);
+  const supportedTypes = ['rating_scale', 'star_rating', 'single_choice', 'multiple_choice', 'dropdown', 'short_text', 'long_text', 'number', 'date', 'email'];
+  const supportedActivityTypes = ['training', 'livelihood', 'seminar', 'outreach', 'community_service'];
+  const validSections = sections.every((section: any) => typeof section?.title === 'string' && section.title.trim() && Array.isArray(section.questions));
+  const validQuestions = sections.every((section: any) => section.questions.every((question: any) =>
+    typeof question?.label === 'string' && question.label.trim() && supportedTypes.includes(question.type) && typeof question.required === 'boolean' &&
+    (!['single_choice', 'multiple_choice', 'dropdown'].includes(question.type) || (Array.isArray(question.options) && question.options.length >= 2 && question.options.every((option: unknown) => typeof option === 'string' && option.trim()))) &&
+    (question.type !== 'rating_scale' || (Number.isInteger(question.scaleMin) && Number.isInteger(question.scaleMax) && question.scaleMax > question.scaleMin && question.scaleMax - question.scaleMin <= 9))
+  ));
+  if (!validSections || !validQuestions || (activityType !== undefined && !supportedActivityTypes.includes(activityType)) || questionCount < 1 || questionCount > 300) {
+    return res.status(400).json({ error: 'The form contains an invalid section or question. Check labels, field types, required flags, and the 300-question limit.' });
+  }
+
+  const now = new Date().toISOString();
+  const formId = `form-${randomUUID()}`;
+  const form = {
+    id: formId,
+    title: typeof formTitle === 'string' ? formTitle.trim() : title.trim(),
+    description: typeof description === 'string' ? description.slice(0, 3000) : '',
+    instructions: typeof instructions === 'string' ? instructions.slice(0, 3000) : '',
+    status: 'draft',
+    version: 1,
+    targetActivityType: 'all',
+    sections,
+    createdAt: now,
+    updatedAt: now
+  };
+  const activity: ServerActivity = {
+    id: `act-${randomUUID()}`,
+    title: title.trim(),
+    activityType: supportedActivityTypes.includes(activityType) ? activityType : 'training',
+    description: typeof description === 'string' ? description.slice(0, 3000) : '',
+    instructions: typeof instructions === 'string' ? instructions.slice(0, 3000) : '',
+    date: now.slice(0, 10),
+    venue: 'To be confirmed',
+    targetBeneficiaries: 'To be confirmed',
+    organizingDepartment: 'To be confirmed',
+    leadCoordinator: 'To be assigned',
+    trainerOrSpeaker: 'To be assigned',
+    status: 'draft',
+    totalTargetParticipants: 30,
+    assignedFormId: formId,
+    createdAt: now
+  };
+
+  evaluationForms.unshift(form);
+  activities.unshift(activity);
+  const result = { form, activity };
+  completedEvaluationImports.set(requestId, result);
+  if (completedEvaluationImports.size > 5000) completedEvaluationImports.delete(completedEvaluationImports.keys().next().value!);
+  auditLogs.unshift({
+    id: `log-${randomUUID()}`,
+    timestamp: now,
+    adminName: 'Administrator',
+    action: 'EVALUATION_IMPORTED',
+    resourceId: activity.id,
+    reason: `Imported draft evaluation activity "${activity.title}" with ${questionCount} questions.`
+  });
+  return res.status(201).json(result);
+});
+
 app.get('/api/forms', (_req, res) => {
   res.json(evaluationForms);
 });

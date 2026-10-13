@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Activity, ActivityType, EvaluationSubmission } from '../types';
+import { Activity, ActivityType, EvaluationSubmission, FormQuestion } from '../types';
 import { 
   CORE_QUESTIONS, 
   ACTIVITY_SPECIFIC_QUESTIONS, 
@@ -23,6 +23,56 @@ import {
   Check
 } from 'lucide-react';
 
+const ImportedQuestionInput: React.FC<{
+  question: FormQuestion;
+  number: number;
+  value?: string | number | string[];
+  onChange: (value: string | number | string[]) => void;
+}> = ({ question, number, value, onChange }) => {
+  const inputId = `answer-${question.id}`;
+  const selectedValues = Array.isArray(value) ? value : [];
+  const scaleValues = Array.from({ length: Math.min(10, Math.max(2, (question.scaleMax || 5) - (question.scaleMin || 1) + 1)) }, (_, index) => (question.scaleMin || 1) + index);
+
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-xs font-bold text-slate-900">{number}. {question.label}{question.required && <span className="text-rose-600"> *</span>}</legend>
+      {question.description && <p className="text-xs text-slate-500">{question.description}</p>}
+      {(question.type === 'rating_scale' || question.type === 'star_rating' || question.type === 'single_choice') && (
+        <div className="flex flex-wrap gap-3" role="radiogroup" aria-label={question.label}>
+          {(question.type === 'single_choice' ? (question.options || []).map((option, index) => ({ value: option, label: option, key: `choice-${index}` })) : scaleValues.map(scale => ({ value: scale, label: String(scale), key: `scale-${scale}` }))).map((option, index) => (
+            <label key={option.key} className="inline-flex items-center gap-2 rounded border border-slate-200 px-3 py-2 text-xs text-slate-800">
+              <input type="radio" name={question.id} value={String(option.value)} required={question.required} checked={String(value ?? '') === String(option.value)} onChange={() => onChange(question.type === 'single_choice' ? String(option.value) : Number(option.value))} />
+              {option.label}
+            </label>
+          ))}
+        </div>
+      )}
+      {question.type === 'multiple_choice' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {(question.options || []).map((option, index) => <label key={option} className="inline-flex items-center gap-2 rounded border border-slate-200 px-3 py-2 text-xs text-slate-800">
+            <input type="checkbox" required={question.required && index === 0} checked={selectedValues.includes(option)} onChange={event => onChange(event.target.checked ? [...selectedValues, option] : selectedValues.filter(item => item !== option))} />
+            {option}
+          </label>)}
+        </div>
+      )}
+      {question.type === 'dropdown' && <select id={inputId} value={String(value ?? '')} required={question.required} onChange={event => onChange(event.target.value)} className="w-full rounded border border-slate-300 p-2.5 text-xs">
+        <option value="">Select an answer</option>{(question.options || []).map(option => <option key={option} value={option}>{option}</option>)}
+      </select>}
+      {['short_text', 'email', 'number', 'date'].includes(question.type) && <input
+        id={inputId}
+        type={question.type === 'short_text' ? 'text' : question.type}
+        required={question.required}
+        value={value ?? ''}
+        onChange={event => onChange(question.type === 'number' ? (event.target.value === '' ? '' : Number(event.target.value)) : event.target.value)}
+        className="w-full rounded border border-slate-300 p-2.5 text-xs"
+        placeholder={question.type === 'short_text' ? 'Enter your response' : undefined}
+      />}
+      {question.type === 'long_text' && <textarea id={inputId} rows={3} required={question.required} value={String(value ?? '')} onChange={event => onChange(event.target.value)} className="w-full rounded border border-slate-300 p-2.5 text-xs" placeholder="Write your response" />}
+      {(question.type === 'rating_scale' || question.type === 'star_rating') && <p className="flex justify-between text-[10px] text-slate-500"><span>{question.scaleMinLabel || 'Lowest'}</span><span>{question.scaleMaxLabel || 'Highest'}</span></p>}
+    </fieldset>
+  );
+};
+
 export const ParticipantEvaluationView: React.FC = () => {
   const { 
     activities, 
@@ -31,10 +81,12 @@ export const ParticipantEvaluationView: React.FC = () => {
     submitEvaluation, 
     isOfflineMode, 
     evaluations, 
-    offlineQueue 
+    offlineQueue,
+    forms
   } = useApp();
 
   const currentActivity = activities.find(a => a.id === selectedActivityId) || activities[0];
+  const assignedForm = forms.find(form => form.id === currentActivity.assignedFormId);
 
   // Participant demographic fields
   const [participantName, setParticipantName] = useState('');
@@ -44,6 +96,11 @@ export const ParticipantEvaluationView: React.FC = () => {
   const [verificationMethod, setVerificationMethod] = useState<'student_id' | 'qr_code' | 'sms_code' | 'signed_attendance'>('student_id');
   const [verificationCode, setVerificationCode] = useState('');
   const [consentAccepted, setConsentAccepted] = useState(false);
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string | number | string[]>>({});
+
+  useEffect(() => {
+    setCustomAnswers({});
+  }, [currentActivity.id, assignedForm?.id]);
 
   // Ratings
   const [coreRatings, setCoreRatings] = useState<Record<string, number>>({
@@ -105,14 +162,23 @@ export const ParticipantEvaluationView: React.FC = () => {
 
     const submissionPayload: Partial<EvaluationSubmission> = {
       activityId: currentActivity.id,
+      formId: assignedForm?.id,
       participantName: participantName.trim(),
       participantEmail: participantEmail.trim().toLowerCase(),
       participantPhone: participantPhone.trim(),
       participantCategory: participantCategory as any,
       verificationMethod,
       controlNumber: verificationCode.trim() || `SLSU-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-      coreRatings: coreRatings as any,
-      specificRatings,
+      coreRatings: assignedForm ? ({} as any) : coreRatings as any,
+      specificRatings: assignedForm
+        ? Object.fromEntries(assignedForm.sections.flatMap(section => section.questions).flatMap(question => {
+            const answer = customAnswers[question.id];
+            if (!['rating_scale', 'star_rating'].includes(question.type) || answer === undefined || answer === '') return [];
+            const value = Number(answer);
+            return Number.isFinite(value) ? [[question.id, value]] : [];
+          }))
+        : specificRatings,
+      customAnswers: assignedForm ? customAnswers : undefined,
       comments: {
         strengths: strengths.trim(),
         improvements: improvements.trim(),
@@ -333,7 +399,31 @@ export const ParticipantEvaluationView: React.FC = () => {
           )}
         </section>
 
+        {assignedForm && <section className="space-y-6" aria-label={assignedForm.title}>
+          <header className="rounded-lg border border-slate-200 bg-white p-5">
+            <h3 className="text-base font-bold text-slate-900">{assignedForm.title}</h3>
+            {assignedForm.description && <p className="mt-1 text-xs text-slate-600">{assignedForm.description}</p>}
+            {assignedForm.instructions && <p className="mt-3 border-l-2 border-emerald-700 pl-3 text-xs text-slate-700">{assignedForm.instructions}</p>}
+          </header>
+          {assignedForm.sections.map((section, sectionIndex) => <section key={section.id} className="rounded-lg border border-slate-200 bg-white p-5 sm:p-7">
+            <div className="mb-5 border-b border-slate-100 pb-3">
+              <h4 className="font-bold text-sm text-slate-900">{sectionIndex + 1}. {section.title}</h4>
+              {section.description && <p className="mt-1 text-xs text-slate-500">{section.description}</p>}
+            </div>
+            <div className="space-y-6">
+              {section.questions.map((question, questionIndex) => <ImportedQuestionInput
+                key={question.id}
+                question={question}
+                number={questionIndex + 1}
+                value={customAnswers[question.id]}
+                onChange={value => setCustomAnswers(current => ({ ...current, [question.id]: value }))}
+              />)}
+            </div>
+          </section>)}
+        </section>}
+
         {/* Section 2: Core Institutional Evaluation Indicators */}
+        {!assignedForm && <>
         <section className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-xs">
           <div className="pb-4 border-b border-slate-100 mb-6">
             <h3 className="font-bold text-base text-slate-900">
@@ -387,9 +477,10 @@ export const ParticipantEvaluationView: React.FC = () => {
             })}
           </div>
         </section>
+        </>}
 
         {/* Section 3: Adaptive Activity-Specific Indicators */}
-        <section className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-xs">
+        {!assignedForm && <section className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-xs">
           <div className="pb-4 border-b border-slate-100 mb-6">
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-base text-slate-900">
@@ -443,7 +534,7 @@ export const ParticipantEvaluationView: React.FC = () => {
               );
             })}
           </div>
-        </section>
+        </section>}
 
         {/* Section 4: Qualitative Written Comments & Suggestions */}
         <section className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-xs">

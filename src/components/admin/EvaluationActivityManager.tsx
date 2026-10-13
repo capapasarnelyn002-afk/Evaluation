@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Activity, ActivityType, ActivityStatus } from '../../types';
+import { Activity, ActivityType, ActivityStatus, EvaluationSubmission } from '../../types';
+import { EvaluationXlsxImportModal } from './EvaluationXlsxImportModal';
+import { EvaluationPrintDocument, EvaluationPrintMode, startEvaluationPrint } from '../EvaluationPrintDocument';
 import { 
   Plus, 
   Calendar, 
@@ -19,7 +21,9 @@ import {
   Layers,
   Save,
   Eye,
-  AlertTriangle
+  AlertTriangle,
+  FileUp,
+  Printer
 } from 'lucide-react';
 
 export const EvaluationActivityManager: React.FC = () => {
@@ -33,7 +37,10 @@ export const EvaluationActivityManager: React.FC = () => {
     duplicateActivity, 
     theme,
     setCurrentView,
-    setSelectedActivityId
+    setSelectedActivityId,
+    role,
+    systemSettings,
+    maskPII
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,6 +69,20 @@ export const EvaluationActivityManager: React.FC = () => {
 
   // Activity Details Modal
   const [detailActivity, setDetailActivity] = useState<Activity | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [printTarget, setPrintTarget] = useState<{ mode: EvaluationPrintMode; activity: Activity; evaluation?: EvaluationSubmission } | null>(null);
+  const [printPaper, setPrintPaper] = useState<'A4' | 'Letter'>('A4');
+
+  useEffect(() => {
+    if (!printTarget) return;
+    const clearPrint = () => setPrintTarget(null);
+    window.addEventListener('afterprint', clearPrint, { once: true });
+    const timer = window.setTimeout(() => startEvaluationPrint(printPaper), 100);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('afterprint', clearPrint);
+    };
+  }, [printTarget, printPaper]);
 
   const openCreateModal = () => {
     setEditingActivity(null);
@@ -160,14 +181,29 @@ export const EvaluationActivityManager: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="px-4 py-2.5 rounded-lg text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0 transition-opacity hover:opacity-90"
-          style={{ backgroundColor: theme.primaryColor }}
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Evaluation Activity</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600">Print paper
+            <select aria-label="Print paper size" value={printPaper} onChange={event => setPrintPaper(event.target.value as 'A4' | 'Letter')} className="rounded border border-slate-300 bg-white px-2 py-2 text-xs">
+              <option value="A4">A4</option>
+              <option value="Letter">Letter</option>
+            </select>
+          </label>
+          {role === 'admin' && <button
+            onClick={() => setShowImportModal(true)}
+            className="px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-800 font-bold text-xs flex items-center gap-1.5 cursor-pointer shrink-0 hover:bg-slate-50"
+          >
+            <FileUp className="w-4 h-4" />
+            <span>Import XLSX</span>
+          </button>}
+          <button
+            onClick={openCreateModal}
+            className="px-4 py-2.5 rounded-lg text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0 transition-opacity hover:opacity-90"
+            style={{ backgroundColor: theme.primaryColor }}
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Evaluation Activity</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -294,6 +330,18 @@ export const EvaluationActivityManager: React.FC = () => {
 
                 {/* Card Action Buttons */}
                 <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 text-xs">
+                  {assignedForm && <button
+                    onClick={() => setPrintTarget({ mode: 'blank', activity: act })}
+                    className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer"
+                    title="Print Blank Form"
+                    aria-label={`Print blank form for ${act.title}`}
+                  ><Printer className="w-3.5 h-3.5" /></button>}
+                  <button
+                    onClick={() => setPrintTarget({ mode: 'summary', activity: act })}
+                    className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer"
+                    title="Print Evaluation Summary"
+                    aria-label={`Print summary for ${act.title}`}
+                  ><FileText className="w-3.5 h-3.5" /></button>
                   <button
                     onClick={() => setDetailActivity(act)}
                     className="flex-1 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold flex items-center justify-center gap-1 cursor-pointer"
@@ -572,6 +620,22 @@ export const EvaluationActivityManager: React.FC = () => {
                   Target Beneficiaries: {detailActivity.targetBeneficiaries}
                 </p>
               </div>
+
+              {role === 'admin' && <div className="space-y-2 border-t border-slate-100 pt-3">
+                <h4 className="font-bold text-slate-800">Saved evaluations</h4>
+                {evaluations.filter(item => item.activityId === detailActivity.id).map(item => (
+                  <div key={item.id} className="flex items-center justify-between gap-3 rounded border border-slate-200 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{maskPII ? 'Respondent' : item.participantName}</p>
+                      <p className="text-[11px] text-slate-500">{item.submittedAt.slice(0, 10)} · Mean {item.meanRating}</p>
+                    </div>
+                    <button type="button" onClick={() => setPrintTarget({ mode: 'completed', activity: detailActivity, evaluation: item })} className="inline-flex shrink-0 items-center gap-1 rounded border border-slate-300 px-2 py-1.5 text-[11px] font-semibold text-slate-700">
+                      <Printer className="h-3.5 w-3.5" /> Print completed
+                    </button>
+                  </div>
+                ))}
+                {evaluations.every(item => item.activityId !== detailActivity.id) && <p className="text-[11px] text-slate-500">No saved evaluations for this activity.</p>}
+              </div>}
             </div>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
@@ -596,6 +660,17 @@ export const EvaluationActivityManager: React.FC = () => {
           </div>
         </div>
       )}
+
+      {showImportModal && <EvaluationXlsxImportModal onClose={() => setShowImportModal(false)} />}
+      {printTarget && <EvaluationPrintDocument
+        mode={printTarget.mode}
+        activity={printTarget.activity}
+        form={forms.find(form => form.id === printTarget.activity.assignedFormId)}
+        evaluation={printTarget.evaluation}
+        theme={theme}
+        institutionName={systemSettings.institutionName}
+        showRespondent={!maskPII}
+      />}
 
     </div>
   );

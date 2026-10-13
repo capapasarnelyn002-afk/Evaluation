@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { EvaluationForm, FormSection, FormQuestion, QuestionType } from '../../types';
+import { EvaluationPrintDocument, startEvaluationPrint } from '../EvaluationPrintDocument';
 import { 
   Plus, 
   Trash2, 
@@ -20,14 +21,28 @@ import {
   FileText,
   Sliders,
   Sparkles
+  ,Printer
 } from 'lucide-react';
 
 export const EvaluationFormBuilder: React.FC = () => {
-  const { forms, createForm, updateForm, deleteForm, duplicateForm, theme } = useApp();
+  const { forms, createForm, updateForm, deleteForm, duplicateForm, theme, systemSettings } = useApp();
 
   const [activeFormId, setActiveFormId] = useState<string>(forms[0]?.id || '');
   const [editingForm, setEditingForm] = useState<EvaluationForm | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
+  const [printForm, setPrintForm] = useState<EvaluationForm | null>(null);
+  const [printPaper, setPrintPaper] = useState<'A4' | 'Letter'>('A4');
+
+  useEffect(() => {
+    if (!printForm) return;
+    const clearPrint = () => setPrintForm(null);
+    window.addEventListener('afterprint', clearPrint, { once: true });
+    const timer = window.setTimeout(() => startEvaluationPrint(printPaper), 100);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('afterprint', clearPrint);
+    };
+  }, [printForm, printPaper]);
 
   // Question editing modal state
   const [showQuestionModal, setShowQuestionModal] = useState<boolean>(false);
@@ -242,6 +257,16 @@ export const EvaluationFormBuilder: React.FC = () => {
             <Eye className="w-4 h-4 text-slate-500" />
             <span>Live Preview</span>
           </button>
+
+          {currentForm && <>
+            <select aria-label="Print paper size" value={printPaper} onChange={event => setPrintPaper(event.target.value as 'A4' | 'Letter')} className="rounded border border-slate-300 bg-white px-2 py-2 text-xs text-slate-700">
+              <option value="A4">A4</option>
+              <option value="Letter">Letter</option>
+            </select>
+            <button type="button" onClick={() => setPrintForm(currentForm)} title="Print blank evaluation form" className="p-2 rounded border border-slate-300 text-slate-700 hover:bg-slate-50" aria-label="Print Evaluation Form">
+              <Printer className="h-4 w-4" />
+            </button>
+          </>}
 
           <button
             onClick={handleCreateNewForm}
@@ -588,6 +613,9 @@ export const EvaluationFormBuilder: React.FC = () => {
                     <option value="dropdown">Dropdown Select</option>
                     <option value="short_text">Short Text Response</option>
                     <option value="long_text">Paragraph Textarea</option>
+                    <option value="number">Number</option>
+                    <option value="date">Date</option>
+                    <option value="email">Email</option>
                   </select>
                 </div>
 
@@ -713,11 +741,11 @@ export const EvaluationFormBuilder: React.FC = () => {
                           <p className="text-[11px] text-slate-500">{q.description}</p>
                         )}
 
-                        {q.type === 'rating_scale' && (
+                        {(q.type === 'rating_scale' || q.type === 'star_rating') && (
                           <div className="flex items-center justify-between gap-2 pt-1">
                             <span className="text-[10px] text-slate-400">{q.scaleMinLabel || 'Low'}</span>
                             <div className="flex gap-2">
-                              {[1, 2, 3, 4, 5].map(v => (
+                              {Array.from({ length: Math.min(10, Math.max(2, (q.scaleMax || 5) - (q.scaleMin || 1) + 1)) }, (_, index) => (q.scaleMin || 1) + index).map(v => (
                                 <button key={v} type="button" className="w-8 h-8 rounded-full border border-slate-300 font-bold hover:bg-emerald-50">
                                   {v}
                                 </button>
@@ -749,6 +777,8 @@ export const EvaluationFormBuilder: React.FC = () => {
                           </div>
                         )}
 
+                        {q.type === 'dropdown' && q.options && <select aria-label={q.label} className="w-full border border-slate-300 rounded p-2 text-xs"><option>Select an answer</option>{q.options.map((option, optionIndex) => <option key={optionIndex}>{option}</option>)}</select>}
+
                         {q.type === 'short_text' && (
                           <input type="text" placeholder="Type answer here..." className="w-full border border-slate-300 rounded p-2 text-xs" />
                         )}
@@ -756,6 +786,8 @@ export const EvaluationFormBuilder: React.FC = () => {
                         {q.type === 'long_text' && (
                           <textarea rows={2} placeholder="Write comments here..." className="w-full border border-slate-300 rounded p-2 text-xs" />
                         )}
+
+                        {['number', 'date', 'email'].includes(q.type) && <input type={q.type} aria-label={q.label} placeholder={q.type === 'number' ? 'Enter a number' : undefined} className="w-full border border-slate-300 rounded p-2 text-xs" />}
                       </div>
                     ))}
                   </div>
@@ -775,6 +807,8 @@ export const EvaluationFormBuilder: React.FC = () => {
           </div>
         </div>
       )}
+
+      {printForm && <EvaluationPrintDocument mode="blank" form={printForm} theme={theme} institutionName={systemSettings.institutionName} />}
 
     </div>
   );

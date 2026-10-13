@@ -7,6 +7,7 @@ import {
   UserRole, 
   UserAccount,
   EvaluationForm,
+  FormSection,
   Survey,
   SurveyResponse,
   WebsiteTheme,
@@ -156,6 +157,7 @@ interface AppContextType {
   selectedActivityId: string | null;
   setSelectedActivityId: (id: string | null) => void;
   createActivity: (activityData: Partial<Activity>) => Promise<Activity>;
+  importEvaluation: (payload: { requestId: string; title: string; formTitle: string; description: string; instructions: string; activityType: Activity['activityType']; sections: FormSection[] }) => Promise<void>;
   updateActivity: (id: string, activityData: Partial<Activity>) => Promise<Activity>;
   deleteActivity: (id: string) => Promise<boolean>;
   duplicateActivity: (id: string) => Promise<Activity>;
@@ -511,6 +513,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return created;
   };
 
+  const importEvaluation = async (payload: { requestId: string; title: string; formTitle: string; description: string; instructions: string; activityType: Activity['activityType']; sections: FormSection[] }): Promise<void> => {
+    const res = await fetch('/api/imports/evaluation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.role },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'The evaluation import failed.');
+    setForms(previous => previous.some(form => form.id === result.form.id) ? previous : [result.form, ...previous]);
+    setActivities(previous => previous.some(activity => activity.id === result.activity.id) ? previous : [result.activity, ...previous]);
+    addToast({ type: 'success', title: 'Evaluation Imported', description: `Draft activity "${result.activity.title}" and its form were created.` });
+  };
+
   const updateActivity = async (id: string, activityData: Partial<Activity>): Promise<Activity> => {
     const res = await fetch(`/api/activities/${id}`, {
       method: 'PUT',
@@ -786,6 +801,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const offlineRecord: EvaluationSubmission = {
         id: `offline-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         activityId: evaluationData.activityId || activities[0].id,
+        formId: evaluationData.formId,
+        customAnswers: evaluationData.customAnswers,
         participantName: evaluationData.participantName || 'Anonymous Participant',
         participantEmail: evaluationData.participantEmail || '',
         participantPhone: evaluationData.participantPhone,
@@ -1018,6 +1035,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedActivityId,
         setSelectedActivityId,
         createActivity,
+        importEvaluation,
         updateActivity,
         deleteActivity,
         duplicateActivity,
