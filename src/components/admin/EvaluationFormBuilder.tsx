@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { EvaluationForm, FormSection, FormQuestion, QuestionType } from '../../types';
 import { EvaluationPrintDocument, startEvaluationPrint } from '../EvaluationPrintDocument';
+import { EvaluationXlsxImportModal } from './EvaluationXlsxImportModal';
 import { 
   Plus, 
   Trash2, 
@@ -21,15 +22,17 @@ import {
   FileText,
   Sliders,
   Sparkles
-  ,Printer
+  ,Printer,
+  FileUp
 } from 'lucide-react';
 
 export const EvaluationFormBuilder: React.FC = () => {
-  const { forms, createForm, updateForm, deleteForm, duplicateForm, theme, systemSettings } = useApp();
+  const { forms, createForm, updateForm, deleteForm, duplicateForm, theme, systemSettings, role } = useApp();
 
   const [activeFormId, setActiveFormId] = useState<string>(forms[0]?.id || '');
   const [editingForm, setEditingForm] = useState<EvaluationForm | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [printForm, setPrintForm] = useState<EvaluationForm | null>(null);
   const [printPaper, setPrintPaper] = useState<'A4' | 'Letter'>('A4');
 
@@ -250,6 +253,14 @@ export const EvaluationFormBuilder: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {role === 'admin' && <button
+            type="button"
+            onClick={() => setShowImportModal(true)}
+            className="px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <FileUp className="w-4 h-4" />
+            <span>Import Excel (.xlsx)</span>
+          </button>}
           <button
             onClick={() => setShowPreviewModal(true)}
             className="px-3.5 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
@@ -809,6 +820,14 @@ export const EvaluationFormBuilder: React.FC = () => {
       )}
 
       {printForm && <EvaluationPrintDocument mode="blank" form={printForm} theme={theme} institutionName={systemSettings.institutionName} />}
+      {showImportModal && <EvaluationXlsxImportModal
+        saveMode="form"
+        onClose={() => setShowImportModal(false)}
+        onFormSaved={form => {
+          setActiveFormId(form.id);
+          setEditingForm(JSON.parse(JSON.stringify(form)));
+        }}
+      />}
 
     </div>
   );

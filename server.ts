@@ -559,9 +559,10 @@ function analyzeSentimentAndTopics(commentsText: string) {
 app.get('/api/activities', (_req, res) => {
   const enhanced = activities.map(act => {
     const actEvals = evaluations.filter(e => e.activityId === act.id);
+    const ratedEvals = actEvals.filter(e => e.meanRating > 0);
     const evalCount = actEvals.length;
-    const avgRating = evalCount > 0
-      ? Number((actEvals.reduce((acc, curr) => acc + curr.meanRating, 0) / evalCount).toFixed(2))
+    const avgRating = ratedEvals.length > 0
+      ? Number((ratedEvals.reduce((acc, curr) => acc + curr.meanRating, 0) / ratedEvals.length).toFixed(2))
       : 0;
     return {
       ...act,
@@ -613,6 +614,55 @@ app.post('/api/evaluations', (req, res) => {
     return;
   }
 
+  const activity = activities.find(item => item.id === payload.activityId);
+  if (!activity) return res.status(404).json({ error: 'Evaluation activity not found.' });
+  let submittedForm: any;
+  let submittedCoreRatings = payload.coreRatings || {};
+  if (payload.formId) {
+    submittedForm = evaluationForms.find(form => form.id === payload.formId);
+    if (!submittedForm) return res.status(404).json({ error: 'Evaluation form not found.' });
+    if (submittedForm.status !== 'published') return res.status(409).json({ error: 'This evaluation form is not published.' });
+    if (activity.assignedFormId !== submittedForm.id) return res.status(400).json({ error: 'This form is not assigned to the selected activity.' });
+  } else if (activity.assignedFormId) {
+    return res.status(400).json({ error: 'The assigned evaluation form is required.' });
+  }
+
+  let submittedSpecificRatings = payload.specificRatings || {};
+  if (submittedForm) {
+    const answers = payload.customAnswers;
+    if (!answers || typeof answers !== 'object' || Array.isArray(answers)) return res.status(400).json({ error: 'Form answers are required.' });
+    const questions = submittedForm.sections.flatMap((section: any) => section.questions || []);
+    const questionIds = new Set(questions.map((question: any) => question.id));
+    if (Object.keys(answers).some(questionId => !questionIds.has(questionId))) return res.status(400).json({ error: 'The submission contains answers for unknown questions.' });
+    for (const question of questions) {
+      const answer = answers[question.id];
+      const isEmpty = answer === undefined || answer === null || answer === '' || (Array.isArray(answer) && answer.length === 0);
+      if (question.required && isEmpty) return res.status(400).json({ error: `A response is required for "${question.label}".` });
+      if (isEmpty) continue;
+      if (['single_choice', 'dropdown'].includes(question.type) && !(question.options || []).includes(answer)) return res.status(400).json({ error: `The response for "${question.label}" is not an allowed option.` });
+      if (question.type === 'multiple_choice' && (!Array.isArray(answer) || answer.some(option => !(question.options || []).includes(option)))) return res.status(400).json({ error: `The response for "${question.label}" contains an invalid option.` });
+      if (['rating_scale', 'star_rating'].includes(question.type)) {
+        const min = question.scaleMin ?? 1;
+        const max = question.scaleMax ?? 5;
+        if (!Number.isInteger(answer) || answer < min || answer > max) return res.status(400).json({ error: `The response for "${question.label}" must be a whole number from ${min} to ${max}.` });
+      }
+      if (question.type === 'number' && (typeof answer !== 'number' || !Number.isFinite(answer))) return res.status(400).json({ error: `The response for "${question.label}" must be a number.` });
+      if (['short_text', 'long_text'].includes(question.type) && typeof answer !== 'string') return res.status(400).json({ error: `The response for "${question.label}" must be text.` });
+      if (typeof answer === 'string' && answer.length > 10000) return res.status(400).json({ error: `The response for "${question.label}" is too long.` });
+      if (question.type === 'email' && (typeof answer !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(answer))) return res.status(400).json({ error: `The response for "${question.label}" must be a valid email address.` });
+      if (question.type === 'date') {
+        if (typeof answer !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(answer)) return res.status(400).json({ error: `The response for "${question.label}" must be a valid date.` });
+        const date = new Date(`${answer}T00:00:00.000Z`);
+        if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== answer) return res.status(400).json({ error: `The response for "${question.label}" must be a valid date.` });
+      }
+    }
+    submittedSpecificRatings = Object.fromEntries(questions.flatMap((question: any) => {
+      const answer = answers[question.id];
+      return ['rating_scale', 'star_rating'].includes(question.type) && Number.isInteger(answer) ? [[question.id, answer]] : [];
+    }));
+    submittedCoreRatings = {};
+  }
+
   // Duplicate prevention check: One evaluation per participant per activity
   const existing = evaluations.find(
     e => e.activityId === payload.activityId &&
@@ -634,12 +684,12 @@ app.post('/api/evaluations', (req, res) => {
   const sentimentAnalysis = analyzeSentimentAndTopics(allComments);
 
   // Compute mean rating
-  const coreVals = Object.values(payload.coreRatings || {}) as number[];
-  const specVals = Object.values(payload.specificRatings || {}) as number[];
+  const coreVals = Object.values(submittedCoreRatings) as number[];
+  const specVals = Object.values(submittedSpecificRatings) as number[];
   const allRatings = [...coreVals, ...specVals];
   const meanRating = allRatings.length > 0
     ? Number((allRatings.reduce((a, b) => a + b, 0) / allRatings.length).toFixed(2))
-    : 4.0;
+    : submittedForm ? 0 : 4.0;
 
   const controlNumber = payload.controlNumber || `SLSU-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -647,7 +697,7 @@ app.post('/api/evaluations', (req, res) => {
     id: `eval-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     activityId: payload.activityId,
     formId: payload.formId,
-    formSnapshot: evaluationForms.find(form => form.id === payload.formId),
+    formSnapshot: submittedForm,
     customAnswers: payload.customAnswers && typeof payload.customAnswers === 'object' ? payload.customAnswers : undefined,
     participantName: payload.participantName,
     participantEmail: payload.participantEmail,
@@ -655,8 +705,8 @@ app.post('/api/evaluations', (req, res) => {
     participantCategory: payload.participantCategory || 'community_member',
     controlNumber,
     verificationMethod: payload.verificationMethod || 'student_id',
-    coreRatings: payload.coreRatings || {},
-    specificRatings: payload.specificRatings || {},
+    coreRatings: submittedCoreRatings,
+    specificRatings: submittedSpecificRatings,
     meanRating,
     comments: {
       strengths: payload.comments?.strengths || '',
@@ -832,7 +882,10 @@ app.post('/api/ai/executive-report', async (req, res) => {
     return;
   }
 
-  const avgRating = Number((targetEvals.reduce((a, b) => a + b.meanRating, 0) / totalCount).toFixed(2));
+  const ratedEvals = targetEvals.filter(e => e.meanRating > 0);
+  const avgRating = ratedEvals.length > 0
+    ? Number((ratedEvals.reduce((total, evaluation) => total + evaluation.meanRating, 0) / ratedEvals.length).toFixed(2))
+    : 0;
   const positiveCount = targetEvals.filter(e => e.sentiment.overall === 'positive').length;
   const neutralCount = targetEvals.filter(e => e.sentiment.overall === 'neutral').length;
   const negativeCount = targetEvals.filter(e => e.sentiment.overall === 'negative').length;
@@ -1153,6 +1206,14 @@ app.post('/api/users', (req, res) => {
   };
 
   users.push(newUser);
+  auditLogs.unshift({
+    id: `log-${randomUUID()}`,
+    timestamp: new Date().toISOString(),
+    adminName: 'Administrator',
+    action: 'USER_CREATED',
+    resourceId: newUser.id,
+    reason: `Created user account for ${newUser.name} (${newUser.role})`
+  });
   res.status(201).json(newUser);
 });
 
@@ -1395,6 +1456,47 @@ let evaluationForms: any[] = [
 
 // Forms endpoints
 const completedEvaluationImports = new Map<string, { form: any; activity: ServerActivity }>();
+const completedFormImports = new Map<string, any>();
+
+app.post('/api/imports/form', (req, res) => {
+  if (req.headers['x-user-role'] !== 'admin') return res.status(403).json({ error: 'Only an administrator can import evaluation forms.' });
+  const { requestId, title, description, instructions, sections, originalFileName } = req.body || {};
+  if (typeof requestId !== 'string' || requestId.length < 8 || requestId.length > 100) return res.status(400).json({ error: 'A valid import request ID is required.' });
+  const priorForm = completedFormImports.get(requestId);
+  if (priorForm) return res.json({ form: priorForm, replayed: true });
+  if (typeof title !== 'string' || !title.trim() || title.trim().length > 200) return res.status(400).json({ error: 'A form title between 1 and 200 characters is required.' });
+  if (!Array.isArray(sections) || sections.length === 0 || sections.length > 100) return res.status(400).json({ error: 'The form needs between 1 and 100 sections.' });
+
+  const questionCount = sections.reduce((count: number, section: any) => count + (Array.isArray(section?.questions) ? section.questions.length : 0), 0);
+  const supportedTypes = ['rating_scale', 'star_rating', 'single_choice', 'multiple_choice', 'dropdown', 'short_text', 'long_text', 'number', 'date', 'email'];
+  const validSections = sections.every((section: any) => typeof section?.title === 'string' && section.title.trim() && Array.isArray(section.questions));
+  const validQuestions = sections.every((section: any) => section.questions.every((question: any) =>
+    typeof question?.label === 'string' && question.label.trim() && supportedTypes.includes(question.type) && typeof question.required === 'boolean' &&
+    (!['single_choice', 'multiple_choice', 'dropdown'].includes(question.type) || (Array.isArray(question.options) && question.options.length >= 2 && question.options.every((option: unknown) => typeof option === 'string' && option.trim()))) &&
+    (question.type !== 'rating_scale' || (Number.isInteger(question.scaleMin) && Number.isInteger(question.scaleMax) && question.scaleMax > question.scaleMin && question.scaleMax - question.scaleMin <= 9))
+  ));
+  if (!validSections || !validQuestions || questionCount < 1 || questionCount > 300) return res.status(400).json({ error: 'The form contains invalid sections or questions. Check labels, field types, options, rating ranges, and the 300-question limit.' });
+
+  const now = new Date().toISOString();
+  const form = {
+    id: `form-${randomUUID()}`,
+    title: title.trim(),
+    description: typeof description === 'string' ? description.slice(0, 3000) : '',
+    instructions: typeof instructions === 'string' ? instructions.slice(0, 3000) : '',
+    status: 'draft',
+    version: 1,
+    targetActivityType: 'all',
+    sections,
+    originalFileName: typeof originalFileName === 'string' ? originalFileName.slice(0, 255) : undefined,
+    createdAt: now,
+    updatedAt: now,
+  };
+  evaluationForms.unshift(form);
+  completedFormImports.set(requestId, form);
+  if (completedFormImports.size > 5000) completedFormImports.delete(completedFormImports.keys().next().value!);
+  auditLogs.unshift({ id: `log-${randomUUID()}`, timestamp: now, adminName: 'Administrator', action: 'FORM_IMPORTED', resourceId: form.id, reason: `Imported draft form "${form.title}" with ${questionCount} questions.` });
+  return res.status(201).json({ form });
+});
 
 app.post('/api/imports/evaluation', (req, res) => {
   if (req.headers['x-user-role'] !== 'admin') {
@@ -1948,8 +2050,9 @@ app.post('/api/theme/reset', (req, res) => {
 // ==========================================
 app.get('/api/admin/metrics', (_req, res) => {
   const totalEvaluations = evaluations.length;
-  const overallSatisfactionMean = totalEvaluations > 0
-    ? Number((evaluations.reduce((a, b) => a + b.meanRating, 0) / totalEvaluations).toFixed(2))
+  const ratedEvaluations = evaluations.filter(evaluation => evaluation.meanRating > 0);
+  const overallSatisfactionMean = ratedEvaluations.length > 0
+    ? Number((ratedEvaluations.reduce((total, evaluation) => total + evaluation.meanRating, 0) / ratedEvaluations.length).toFixed(2))
     : 0;
 
   const totalTargetParticipants = activities.reduce((a, b) => a + (b.totalTargetParticipants || 0), 0);
@@ -2053,33 +2156,6 @@ app.post('/api/activities/:id/duplicate', (req, res) => {
 // ==========================================
 // USER ACCOUNTS & RECOVERY ENDPOINTS
 // ==========================================
-app.get('/api/users', (_req, res) => {
-  res.json(users);
-});
-
-app.post('/api/users', (req, res) => {
-  const newUser = {
-    id: `user-${Date.now()}`,
-    name: req.body.name || 'New User',
-    email: req.body.email || `user${Date.now()}@slsu.edu.ph`,
-    role: req.body.role || 'participant',
-    department: req.body.department || 'SLSU Hinunangan',
-    title: req.body.title || 'Participant',
-    status: req.body.status || 'active',
-    lastLogin: new Date().toISOString()
-  };
-  users.push(newUser as any);
-  auditLogs.unshift({
-    id: `log-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
-    action: 'USER_CREATED',
-    resourceId: newUser.id,
-    reason: `Created user account for ${newUser.name} (${newUser.role})`
-  });
-  res.status(201).json(newUser);
-});
-
 app.put('/api/users/:id', (req, res) => {
   const idx = users.findIndex(u => u.id === req.params.id);
   if (idx === -1) {

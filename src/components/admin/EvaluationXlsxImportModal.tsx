@@ -1,12 +1,14 @@
 import React, { useRef, useState } from 'react';
 import type * as ExcelJSTypes from 'exceljs';
 import { AlertCircle, ArrowDown, ArrowLeft, ArrowUp, Check, Eye, FileSpreadsheet, LoaderCircle, Plus, Trash2, Upload, X } from 'lucide-react';
-import { ActivityType, FormQuestion, FormSection, QuestionType } from '../../types';
-import { buildEvaluationDraft, detectHeaderRow, ImportColumnRole, importColumnRoles, inferColumnRole } from '../../utils/evaluationXlsx';
+import { ActivityType, EvaluationForm, FormQuestion, FormSection, QuestionType } from '../../types';
+import { buildEvaluationDraft, buildWorkbookEvaluationDraft, detectHeaderRow, ImportColumnRole, importColumnRoles, inferColumnRole } from '../../utils/evaluationXlsx';
 import { useApp } from '../../context/AppContext';
 
 interface EvaluationXlsxImportModalProps {
   onClose: () => void;
+  saveMode?: 'activity' | 'form';
+  onFormSaved?: (form: EvaluationForm) => void;
 }
 
 const roleLabels: Record<ImportColumnRole, string> = {
@@ -22,12 +24,14 @@ const roleLabels: Record<ImportColumnRole, string> = {
 };
 
 const typeOptions: QuestionType[] = ['rating_scale', 'star_rating', 'single_choice', 'multiple_choice', 'dropdown', 'short_text', 'long_text', 'number', 'date', 'email'];
+const ALL_WORKSHEETS = '__all_worksheets__';
 
-export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps> = ({ onClose }) => {
-  const { role, importEvaluation, theme } = useApp();
+export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps> = ({ onClose, saveMode = 'activity', onFormSaved }) => {
+  const { role, importEvaluation, importForm, theme } = useApp();
   const [rowsBySheet, setRowsBySheet] = useState<Record<string, unknown[][]>>({});
   const [formulaCount, setFormulaCount] = useState(0);
   const [fileName, setFileName] = useState('');
+  const [originalFileName, setOriginalFileName] = useState('');
   const [sheetName, setSheetName] = useState('');
   const [headerRow, setHeaderRow] = useState(0);
   const [mapping, setMapping] = useState<ImportColumnRole[]>([]);
@@ -49,6 +53,12 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
   const rows = rowsBySheet[sheetName] || [];
   const headers = (rows[headerRow] || []).map((value, index) => String(value || `Column ${index + 1}`).trim());
   const questions = sections.reduce((total, section) => total + section.questions.length, 0);
+  const hasUnmappedSheets = !!draft?.warnings.some(warning => warning.includes('could not be mapped automatically'));
+  const hasExcludedWorksheets = !!draft?.warnings.some(warning => warning.includes('not included from this import'));
+  const fieldTypeSummary = Object.entries(sections.flatMap(section => section.questions).reduce<Record<string, number>>((counts, question) => {
+    counts[question.type] = (counts[question.type] || 0) + 1;
+    return counts;
+  }, {})).map(([type, count]) => `${type.replace('_', ' ')}: ${count}`).join(' · ');
   const reviewErrors = sections.flatMap(section => [
     ...(!section.title.trim() ? ['Every section needs a heading.'] : []),
     ...section.questions.flatMap(question => [
@@ -57,13 +67,22 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
       ...(question.type === 'rating_scale' && ((question.scaleMax || 5) <= (question.scaleMin || 1) || (question.scaleMax || 5) - (question.scaleMin || 1) > 9) ? [`"${question.label}" needs a valid rating range with 2 to 10 values.`] : []),
     ]),
   ]);
-  if (!title.trim()) reviewErrors.push('Enter an activity and form title before saving.');
+  if (saveMode === 'activity' && !title.trim()) reviewErrors.push('Enter an activity title before saving.');
   if (!formTitle.trim()) reviewErrors.push('Enter a form title before saving.');
 
   const handleUpload = async (file?: File) => {
     setError('');
     setDraft(null);
     if (!file) return;
+    setRowsBySheet({});
+    setFormulaCount(0);
+    setFileName('');
+    setOriginalFileName('');
+    setSheetName('');
+    setMapping([]);
+    setSections([]);
+    setSkipConfirmed(false);
+    setShowRespondentPreview(false);
     if (!file.name.toLowerCase().endsWith('.xlsx')) {
       setError('Choose an .xlsx workbook. Legacy .xls files are not supported.');
       return;
@@ -99,20 +118,47 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
       const firstSheet = workbook.worksheets[0].name;
       const parsedRows = allRows[firstSheet];
       const detectedHeader = detectHeaderRow(parsedRows);
+      const detectedTitle = String(workbook.title || file.name.replace(/\.xlsx$/i, '').replace(/[_-]+/g, ' ').trim());
       setRowsBySheet(allRows);
       setFormulaCount(formulas);
-      setFileName(String(workbook.title || file.name.replace(/\.xlsx$/i, '').replace(/[_-]+/g, ' ').trim()));
-      setSheetName(firstSheet);
+      setFileName(detectedTitle);
+      setOriginalFileName(file.name);
+      setSheetName(ALL_WORKSHEETS);
       setHeaderRow(detectedHeader);
-      setMapping((parsedRows[detectedHeader] || []).map(value => inferColumnRole(String(value ?? ''))));
+      setMapping([]);
       setSkipConfirmed(false);
-      if (!parsedRows.some(row => row.some(value => String(value ?? '').trim()))) setError('This worksheet is empty. Select a worksheet that contains evaluation questions.');
+      const generated = buildWorkbookEvaluationDraft(allRows, detectedTitle);
+      if (formulas) generated.warnings.unshift(`${formulas} formula cell(s) were found. Formula results are not evaluated or imported.`);
+      setDraft(generated);
+      setTitle(generated.title);
+      setFormTitle(generated.title);
+      setDescription(generated.description);
+      setInstructions(generated.instructions);
+      setSections(JSON.parse(JSON.stringify(generated.sections)) as FormSection[]);
+      setShowRespondentPreview(true);
+      if (!Object.values(allRows).some(sheetRows => sheetRows.some(row => row.some(value => String(value ?? '').trim())))) setError('The workbook contains no non-empty worksheets.');
     } catch (cause) {
       setError(cause instanceof Error ? `Could not read workbook: ${cause.message}` : 'Could not read this workbook.');
     }
   };
 
   const changeSheet = (name: string) => {
+    if (name === ALL_WORKSHEETS) {
+      const generated = buildWorkbookEvaluationDraft(rowsBySheet, fileName);
+      if (formulaCount) generated.warnings.unshift(`${formulaCount} formula cell(s) were found. Formula results are not evaluated or imported.`);
+      setSheetName(name);
+      setMapping([]);
+      setSkipConfirmed(false);
+      setDraft(generated);
+      setTitle(generated.title);
+      setFormTitle(generated.title);
+      setDescription(generated.description);
+      setInstructions(generated.instructions);
+      setSections(JSON.parse(JSON.stringify(generated.sections)) as FormSection[]);
+      setShowRespondentPreview(true);
+      setError('');
+      return;
+    }
     const nextRows = rowsBySheet[name] || [];
     const nextHeader = detectHeaderRow(nextRows);
     setSheetName(name);
@@ -131,7 +177,22 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
   };
 
   const handleGenerate = () => {
+    if (sheetName === ALL_WORKSHEETS) {
+      const generated = buildWorkbookEvaluationDraft(rowsBySheet, fileName);
+      if (formulaCount) generated.warnings.unshift(`${formulaCount} formula cell(s) were found. Formula results are not evaluated or imported.`);
+      setDraft(generated);
+      setTitle(generated.title);
+      setFormTitle(generated.title);
+      setDescription(generated.description);
+      setInstructions(generated.instructions);
+      setSections(JSON.parse(JSON.stringify(generated.sections)) as FormSection[]);
+      setShowRespondentPreview(true);
+      setError('');
+      return;
+    }
     const generated = buildEvaluationDraft(rows, headerRow, mapping, fileName, sheetName);
+    const excludedSheets = Object.entries(rowsBySheet).filter(([name, sheetRows]) => name !== sheetName && sheetRows.some(row => row.some(value => String(value ?? '').trim()))).map(([name]) => name);
+    if (excludedSheets.length) generated.warnings.unshift(`Non-empty worksheets not included from this import: ${excludedSheets.join(', ')}.`);
     if (formulaCount) generated.warnings.unshift(`${formulaCount} formula cell(s) were found. Formula values are not evaluated or imported.`);
     setDraft(generated);
     setTitle(generated.title);
@@ -198,15 +259,27 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
     setIsSaving(true);
     setError('');
     try {
-      await importEvaluation({
-        requestId: requestIdRef.current,
-        title: title.trim(),
-        formTitle: formTitle.trim(),
-        description: description.trim(),
-        instructions: instructions.trim(),
-        activityType,
-        sections,
-      });
+      if (saveMode === 'form') {
+        const created = await importForm({
+          requestId: requestIdRef.current,
+          title: formTitle.trim(),
+          description: description.trim(),
+          instructions: instructions.trim(),
+          sections,
+          originalFileName,
+        });
+        onFormSaved?.(created);
+      } else {
+        await importEvaluation({
+          requestId: requestIdRef.current,
+          title: title.trim(),
+          formTitle: formTitle.trim(),
+          description: description.trim(),
+          instructions: instructions.trim(),
+          activityType,
+          sections,
+        });
+      }
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The imported evaluation could not be saved.');
@@ -246,7 +319,7 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
         <header className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200">
           <div>
             <h2 id="xlsx-import-title" className="text-base font-bold text-slate-900">Import evaluation workbook</h2>
-            <p className="mt-1 text-xs text-slate-500">Review the detected questions and save the generated activity as a draft.</p>
+            <p className="mt-1 text-xs text-slate-500">Review the detected questions and save the generated form as a draft.</p>
           </div>
           <button type="button" aria-label="Close import" onClick={onClose} disabled={isSaving} className="p-1 text-slate-500 hover:text-slate-900"><X className="w-5 h-5" /></button>
         </header>
@@ -270,6 +343,7 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="text-xs font-semibold text-slate-700">Worksheet
                   <select value={sheetName} onChange={event => changeSheet(event.target.value)} className="mt-1 block w-full rounded border border-slate-300 p-2 font-normal">
+                    <option value={ALL_WORKSHEETS}>All worksheets (automatic mapping)</option>
                     {Object.keys(rowsBySheet).map(name => <option key={name} value={name}>{name}</option>)}
                   </select>
                 </label>
@@ -280,7 +354,7 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
                 </label>
               </div>
 
-              <div className="overflow-x-auto rounded border border-slate-200">
+              {rows.length > 0 && <div className="overflow-x-auto rounded border border-slate-200">
                 <table className="min-w-full text-left text-xs">
                   <thead className="bg-slate-100"><tr>{headers.map((header, index) => (
                     <th key={index} className="min-w-40 p-2 align-top font-semibold text-slate-800">
@@ -294,10 +368,10 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
                     <tr key={rowIndex} className="border-t border-slate-100">{headers.map((_, column) => <td key={column} className="max-w-56 truncate p-2 text-slate-600" title={String(row[column] ?? '')}>{String(row[column] ?? '')}</td>)}</tr>
                   ))}</tbody>
                 </table>
-              </div>
-              {mapping.includes('skip') && <label className="flex items-start gap-2 rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+              </div>}
+              {(mapping.includes('skip') || hasUnmappedSheets || hasExcludedWorksheets) && <label className="flex items-start gap-2 rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
                 <input type="checkbox" checked={skipConfirmed} onChange={event => setSkipConfirmed(event.target.checked)} className="mt-0.5" />
-                <span>I reviewed the columns marked “Skip this column” and confirm that their content should not be included in this evaluation.</span>
+                <span>{hasUnmappedSheets || hasExcludedWorksheets ? 'I reviewed the non-empty worksheets flagged as unrecognized or excluded and confirm they do not contain questions to include.' : 'I reviewed the columns marked “Skip this column” and confirm that their content should not be included in this evaluation.'}</span>
               </label>}
               {formulaCount > 0 && <p className="rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">{formulaCount} formula cell(s) detected. Formula results will not be imported.</p>}
               <button type="button" onClick={handleGenerate} className="rounded px-4 py-2 text-xs font-bold text-white" style={{ backgroundColor: theme.primaryColor }}>Generate review draft</button>
@@ -309,7 +383,7 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
               <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-3">
                 <button type="button" onClick={() => setDraft(null)} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700"><ArrowLeft className="w-4 h-4" /> Back to mapping</button>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500">{sections.length} sections · {questions} questions · draft</span>
+                  <span className="text-right text-xs text-slate-500">{sections.length} sections · {questions} fields · draft{fieldTypeSummary && <span className="block max-w-xl">{fieldTypeSummary}</span>}</span>
                   <button type="button" onClick={() => setShowRespondentPreview(value => !value)} className="inline-flex items-center gap-1 rounded border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700"><Eye className="h-3.5 w-3.5" />{showRespondentPreview ? 'Hide preview' : 'Preview as respondent'}</button>
                 </div>
               </div>
@@ -318,20 +392,20 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
               {error && <p role="alert" className="rounded border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900">{error}</p>}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <label className="text-xs font-semibold text-slate-700">Activity title
+                {saveMode === 'activity' && <label className="text-xs font-semibold text-slate-700">Activity title
                   <input value={title} onChange={event => setTitle(event.target.value)} className="mt-1 block w-full rounded border border-slate-300 p-2 font-normal" />
-                </label>
+                </label>}
                 <label className="text-xs font-semibold text-slate-700">Form title
                   <input value={formTitle} onChange={event => setFormTitle(event.target.value)} className="mt-1 block w-full rounded border border-slate-300 p-2 font-normal" />
                 </label>
-                <label className="text-xs font-semibold text-slate-700">Activity description
+                <label className="text-xs font-semibold text-slate-700">{saveMode === 'activity' ? 'Activity description' : 'Form description'}
                   <input value={description} onChange={event => setDescription(event.target.value)} className="mt-1 block w-full rounded border border-slate-300 p-2 font-normal" />
                 </label>
-                <label className="text-xs font-semibold text-slate-700">Activity type
+                {saveMode === 'activity' && <label className="text-xs font-semibold text-slate-700">Activity type
                   <select value={activityType} onChange={event => setActivityType(event.target.value as ActivityType)} className="mt-1 block w-full rounded border border-slate-300 p-2 font-normal">
                     <option value="training">Training</option><option value="livelihood">Livelihood</option><option value="seminar">Seminar</option><option value="outreach">Outreach</option><option value="community_service">Community service</option>
                   </select>
-                </label>
+                </label>}
               </div>
               <label className="block text-xs font-semibold text-slate-700">Form instructions
                 <textarea rows={2} value={instructions} onChange={event => setInstructions(event.target.value)} className="mt-1 block w-full rounded border border-slate-300 p-2 font-normal" />
@@ -413,9 +487,9 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
             <span className="text-xs text-slate-500">Nothing is saved until you confirm.</span>
             <div className="flex items-center gap-2">
               <button type="button" onClick={onClose} disabled={isSaving} className="rounded border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Cancel</button>
-              <button type="button" onClick={() => void handleSave()} disabled={isSaving || role !== 'admin' || draft.errors.length > 0 || reviewErrors.length > 0 || !questions || (mapping.includes('skip') && !skipConfirmed)} className="inline-flex items-center gap-2 rounded px-4 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: theme.primaryColor }}>
+              <button type="button" onClick={() => void handleSave()} disabled={isSaving || role !== 'admin' || draft.errors.length > 0 || reviewErrors.length > 0 || !questions || ((mapping.includes('skip') || hasUnmappedSheets || hasExcludedWorksheets) && !skipConfirmed)} className="inline-flex items-center gap-2 rounded px-4 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: theme.primaryColor }}>
                 {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                Save as draft activity
+                {saveMode === 'form' ? 'Save as draft form' : 'Save as draft activity'}
               </button>
             </div>
           </footer>

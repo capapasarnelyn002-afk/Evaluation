@@ -86,7 +86,7 @@ export const ParticipantEvaluationView: React.FC = () => {
   } = useApp();
 
   const currentActivity = activities.find(a => a.id === selectedActivityId) || activities[0];
-  const assignedForm = forms.find(form => form.id === currentActivity.assignedFormId);
+  const assignedForm = forms.find(form => form.id === currentActivity.assignedFormId && form.status === 'published');
 
   // Participant demographic fields
   const [participantName, setParticipantName] = useState('');

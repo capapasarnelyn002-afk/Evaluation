@@ -132,6 +132,7 @@ export interface EvaluationForm {
   status: 'draft' | 'published' | 'archived';
   version: number;
   targetActivityType?: ActivityType | 'all';
+  originalFileName?: string;
   sections: FormSection[];
   createdAt: string;
   updatedAt: string;

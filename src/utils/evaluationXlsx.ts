@@ -15,7 +15,7 @@ const FIELD_ROLES: ImportColumnRole[] = ['question', 'section', 'description', '
 
 export const inferColumnRole = (header: string): ImportColumnRole => {
   const value = header.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  if (/^(question|question text|prompt|item|evaluation question|statement|label)$/.test(value) || value.includes('question')) return 'question';
+  if (/^(question|question text|prompt|item|evaluation question|statement|label)$/.test(value)) return 'question';
   if (/^(section|category|dimension|group|heading)$/.test(value) || value.includes('section')) return 'section';
   if (/^(description|help text|hint|sub question|details)$/.test(value) || value.includes('instruction for respondent')) return 'description';
   if (/^(type|field type|response type|answer type|input type)$/.test(value)) return 'type';
@@ -75,8 +75,8 @@ const inferQuestionType = (question: string, options: string[], explicitType: st
   if (/\b(email|e-mail)\b/.test(text)) return { type: 'email' };
   if (/\b(date|when did|when was)\b/.test(text)) return { type: 'date' };
   if (/\b(number|how many|amount|score|age|quantity)\b/.test(text)) return { type: 'number' };
-  if (/\b(explain|describe|comment|suggest|why|additional feedback|elaborate)\b/.test(text)) return { type: 'long_text' };
-  if (/\byes\s*\/\s*no\b/.test(text)) return { type: 'single_choice' };
+  if (/\b(explain|describe|comment|suggest|why|additional feedback|elaborate|improv\w*|strengths|weaknesses)\b/.test(text)) return { type: 'long_text' };
+  if (/\byes\s*\/\s*no\b/.test(text) || /^(would|should|do|does|did|is|are|was|were|can|could|have|has)\b/.test(text)) return { type: 'single_choice' };
   return { type: 'short_text' };
 };
 
@@ -146,7 +146,7 @@ export const buildEvaluationDraft = (
     let options = valueAt(row, 'options').split(/[|;\n]/).map(option => option.trim()).filter(Boolean);
     const explicitType = valueAt(row, 'type');
     const inferred = inferQuestionType(question, options, explicitType);
-    if (!options.length && inferred.type === 'single_choice' && /\byes\s*\/\s*no\b/i.test(question)) options = ['Yes', 'No'];
+    if (!options.length && inferred.type === 'single_choice' && (/\byes\s*\/\s*no\b/i.test(question) || /^(would|should|do|does|did|is|are|was|were|can|could|have|has)\b/i.test(question))) options = ['Yes', 'No'];
     if (explicitType && !normalizeType(explicitType)) {
       errors.push(`Row ${sourceRow} uses unsupported response type "${explicitType}".`);
       return;
@@ -192,6 +192,162 @@ export const buildEvaluationDraft = (
     title,
     description: `Imported evaluation form from ${sheetName}.`,
     instructions: instruction || 'Please answer each question. Required questions are marked.',
+    sections,
+    errors,
+    warnings,
+  };
+};
+
+export const buildLayoutEvaluationDraft = (rows: unknown[][], fileTitle: string, sheetName: string): ImportedEvaluationDraft => {
+  const sections = new Map<string, FormQuestion[]>();
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const namedFields = /^(name|office|organization|organisation|position|location|department|date|email|phone|contact number|age|remarks|comments|suggestions|feedback)(\s*[:.]?)$/i;
+  const firstNonEmptyRow = rows.find(row => row.some(value => String(value ?? '').trim())) || [];
+  const firstNonEmptyValue = String(firstNonEmptyRow.find(value => String(value ?? '').trim()) || '').trim();
+  const title = firstNonEmptyRow.filter(value => String(value ?? '').trim()).length === 1 && !namedFields.test(firstNonEmptyValue) && !/[?]$/.test(firstNonEmptyValue)
+    ? firstNonEmptyValue
+    : fileTitle || sheetName;
+  let instructions = '';
+  let activeSection = 'General Questions';
+  let questionId = 0;
+  let matrixOptions: string[] | null = null;
+
+  const pushQuestion = (label: string, options: string[] = [], inferredType?: QuestionType) => {
+    const question = label.trim();
+    if (!question) return;
+    const inferred = inferQuestionType(question, options, '');
+    let type = inferredType || inferred.type;
+    let finalOptions = options;
+    if (!finalOptions.length && type === 'single_choice' && /^(would|should|do|does|did|is|are|was|were|can|could|have|has)\b/i.test(question)) finalOptions = ['Yes', 'No'];
+    if (['single_choice', 'multiple_choice', 'dropdown'].includes(type) && finalOptions.length < 2) {
+      errors.push(`"${question}" looks like a choice question, but at least two answer options could not be identified.`);
+      return;
+    }
+    const questionData: FormQuestion = {
+      id: `layout-q-${questionId++}`,
+      label: question,
+      type,
+      required: false,
+      options: ['single_choice', 'multiple_choice', 'dropdown'].includes(type) ? finalOptions : undefined,
+      scaleMin: type === 'rating_scale' ? inferred.min || 1 : undefined,
+      scaleMax: type === 'rating_scale' ? inferred.max || 5 : undefined,
+      scaleMinLabel: inferred.minLabel,
+      scaleMaxLabel: inferred.maxLabel,
+    };
+    sections.set(activeSection, [...(sections.get(activeSection) || []), questionData]);
+    warnings.push(`"${question}" was inferred from a worksheet layout without a question header; review its field type and required setting.`);
+  };
+
+  rows.forEach((row, index) => {
+    const values = row.map(value => String(value ?? '').trim());
+    const present = values.filter(Boolean);
+    if (!present.length) return;
+    if (/^instructions?\s*:/i.test(present[0])) {
+      instructions = present[0].replace(/^instructions?\s*:\s*/i, '');
+      return;
+    }
+
+    if (present.length > 1 && /^(criteria|criterion|dimension|evaluation item|factor)$/i.test(present[0]) && present.slice(1).every(value => /^(\d+|poor|fair|good|excellent|strongly disagree|disagree|neutral|agree|strongly agree|unsatisfactory|satisfactory|outstanding)$/i.test(value))) {
+      matrixOptions = present.slice(1);
+      activeSection = 'Rating Rubric';
+      if (!sections.has(activeSection)) sections.set(activeSection, []);
+      return;
+    }
+
+    if (matrixOptions && present.length === 1 && !/[?.]$/.test(present[0]) && !namedFields.test(present[0])) {
+      const numericOptions = matrixOptions.every(value => /^\d+$/.test(value));
+      if (numericOptions) {
+        const minimum = Number(matrixOptions[0]);
+        const maximum = Number(matrixOptions[matrixOptions.length - 1]);
+        if (maximum > minimum && maximum - minimum < 10) {
+          const q: FormQuestion = { id: `layout-q-${questionId++}`, label: present[0], type: 'rating_scale', required: false, scaleMin: minimum, scaleMax: maximum };
+          sections.set(activeSection, [...(sections.get(activeSection) || []), q]);
+          warnings.push(`"${present[0]}" was interpreted as a row in a rating rubric. Review the scale before publishing.`);
+          return;
+        }
+      }
+      pushQuestion(present[0], matrixOptions, 'single_choice');
+      return;
+    }
+
+    if (present.length === 1) {
+      const value = present[0];
+      if (/^(section|part)\b/i.test(value) || /^(?:[IVX]+|\d+)[.)\s:-]+\S/.test(value)) {
+        activeSection = value;
+        if (!sections.has(activeSection)) sections.set(activeSection, []);
+        return;
+      }
+      if (namedFields.test(value) || /[?]$/.test(value) || /^\d+[.)]\s*\S/.test(value)) {
+        pushQuestion(value.replace(/\s*[:.]$/, ''));
+        return;
+      }
+      if (index === 0 && value === title) return;
+      warnings.push(`Worksheet row ${index + 1} contains text that was not confidently classified as a title, section, instruction, or question.`);
+      return;
+    }
+
+    const [label, ...choices] = present;
+    if (/[?]$/.test(label) || /^\d+[.)]\s*\S/.test(label) || namedFields.test(label)) {
+      const choiceOptions = choices.filter(value => !/^(required|optional)$/i.test(value));
+      const multiple = /\b(select|check) all that apply\b|\bmultiple selections?\b/i.test(label);
+      pushQuestion(label, choiceOptions, choiceOptions.length > 1 ? (multiple ? 'multiple_choice' : 'single_choice') : undefined);
+    } else {
+      warnings.push(`Worksheet row ${index + 1} contains multiple cells that were not confidently classified as a question and its options.`);
+    }
+  });
+
+  const builtSections = [...sections.entries()].map(([sectionTitle, questions], index): FormSection => ({ id: `layout-section-${index + 1}`, title: sectionTitle, questions }));
+  if (!builtSections.some(section => section.questions.length)) errors.push('No confidently recognizable question labels or rubric rows were found. Use manual column mapping for this worksheet.');
+  return {
+    title,
+    description: `Imported evaluation form from ${sheetName}.`,
+    instructions: instructions || 'Please answer each question. Required fields have not been inferred from this layout and should be reviewed.',
+    sections: builtSections,
+    errors,
+    warnings,
+  };
+};
+
+export const buildWorkbookEvaluationDraft = (worksheets: Record<string, unknown[][]>, fileTitle: string): ImportedEvaluationDraft => {
+  const sections: FormSection[] = [];
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const drafts: ImportedEvaluationDraft[] = [];
+  const unmappedSheets: string[] = [];
+
+  Object.entries(worksheets).forEach(([sheetName, rows], sheetIndex) => {
+    if (!rows.some(row => row.some(value => String(value ?? '').trim()))) return;
+    const headerRow = detectHeaderRow(rows);
+    const mapping = (rows[headerRow] || []).map(value => inferColumnRole(String(value ?? '')));
+    const hasQuestionColumn = mapping.includes('question');
+    const draft = hasQuestionColumn
+      ? buildEvaluationDraft(rows, headerRow, mapping, fileTitle, sheetName)
+      : buildLayoutEvaluationDraft(rows, fileTitle, sheetName);
+    if (!draft.sections.length) {
+      if (hasQuestionColumn) errors.push(...draft.errors.map(message => `${sheetName}: ${message}`));
+      unmappedSheets.push(sheetName);
+      return;
+    }
+    drafts.push(draft);
+    errors.push(...draft.errors.map(message => `${sheetName}: ${message}`));
+    warnings.push(...draft.warnings.filter(message => !message.startsWith('No title column mapped')));
+    draft.sections.forEach((section, sectionIndex) => sections.push({
+      ...section,
+      id: `import-sheet-${sheetIndex}-section-${sectionIndex}`,
+      title: `${sheetName} - ${section.title}`,
+      questions: section.questions.map(question => ({ ...question, id: `import-sheet-${sheetIndex}-${question.id}` })),
+    }));
+  });
+
+  if (unmappedSheets.length) warnings.push(`These non-empty worksheets could not be mapped automatically: ${unmappedSheets.join(', ')}. Review them individually or confirm they do not contain form content.`);
+  if (!sections.length && !unmappedSheets.length) errors.push('The workbook contains no non-empty worksheets.');
+  if (!sections.length && unmappedSheets.length) errors.push('No worksheet had recognizable question columns. Choose a worksheet and map its columns manually.');
+
+  return {
+    title: drafts.find(draft => draft.title)?.title || fileTitle,
+    description: drafts.find(draft => draft.description)?.description || '',
+    instructions: drafts.find(draft => draft.instructions)?.instructions || 'Please answer each question. Required questions are marked.',
     sections,
     errors,
     warnings,

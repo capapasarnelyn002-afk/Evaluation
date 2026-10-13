@@ -164,6 +164,7 @@ interface AppContextType {
 
   // Domain Data: Forms Builder
   forms: EvaluationForm[];
+  importForm: (payload: { requestId: string; title: string; description: string; instructions: string; sections: FormSection[]; originalFileName?: string }) => Promise<EvaluationForm>;
   createForm: (formData: Partial<EvaluationForm>) => Promise<EvaluationForm>;
   updateForm: (id: string, formData: Partial<EvaluationForm>) => Promise<EvaluationForm>;
   deleteForm: (id: string) => Promise<boolean>;
@@ -557,6 +558,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Evaluation Form Builder
+  const importForm = async (payload: { requestId: string; title: string; description: string; instructions: string; sections: FormSection[]; originalFileName?: string }): Promise<EvaluationForm> => {
+    const res = await fetch('/api/imports/form', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.role },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'The imported form could not be saved.');
+    setForms(previous => previous.some(form => form.id === result.form.id) ? previous : [result.form, ...previous]);
+    addToast({ type: 'success', title: 'Form Imported', description: `Draft form "${result.form.title}" is ready to edit.` });
+    return result.form;
+  };
+
   const createForm = async (formData: Partial<EvaluationForm>): Promise<EvaluationForm> => {
     const res = await fetch('/api/forms', {
       method: 'POST',
@@ -1041,6 +1055,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         duplicateActivity,
 
         forms,
+        importForm,
         createForm,
         updateForm,
         deleteForm,
