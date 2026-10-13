@@ -1505,7 +1505,7 @@ app.post('/api/imports/form', (req, res) => {
   if (!Array.isArray(sections) || sections.length === 0 || sections.length > 100) return res.status(400).json({ error: 'The form needs between 1 and 100 sections.' });
 
   const questionCount = sections.reduce((count: number, section: any) => count + (Array.isArray(section?.questions) ? section.questions.length : 0), 0);
-  const supportedTypes = ['rating_scale', 'star_rating', 'single_choice', 'multiple_choice', 'dropdown', 'short_text', 'long_text', 'number', 'date', 'email', 'yes_no', 'likert_scale', 'rubric_table', 'instructions'];
+  const supportedTypes = ['short_text', 'paragraph', 'single_choice', 'multiple_choice', 'dropdown', 'linear_scale', 'rating_scale', 'star_rating', 'likert_scale', 'multiple_choice_grid', 'checkbox_grid', 'date', 'time', 'number', 'yes_no', 'rubric_table', 'section_title', 'instructions', 'long_text', 'email'];
   const validSections = sections.every((section: any) => typeof section?.title === 'string' && section.title.trim() && Array.isArray(section.questions));
   const validQuestions = sections.every((section: any) => section.questions.every((question: any) =>
     typeof question?.label === 'string' && question.label.trim() && supportedTypes.includes(question.type) && typeof question.required === 'boolean' &&
@@ -1554,7 +1554,7 @@ app.post('/api/imports/evaluation', (req, res) => {
     return res.status(400).json({ error: 'The evaluation needs between 1 and 100 sections.' });
   }
   const questionCount = sections.reduce((count: number, section: any) => count + (Array.isArray(section?.questions) ? section.questions.length : 0), 0);
-  const supportedTypes = ['rating_scale', 'star_rating', 'single_choice', 'multiple_choice', 'dropdown', 'short_text', 'long_text', 'number', 'date', 'email', 'yes_no', 'likert_scale', 'rubric_table', 'instructions'];
+  const supportedTypes = ['short_text', 'paragraph', 'single_choice', 'multiple_choice', 'dropdown', 'linear_scale', 'rating_scale', 'star_rating', 'likert_scale', 'multiple_choice_grid', 'checkbox_grid', 'date', 'time', 'number', 'yes_no', 'rubric_table', 'section_title', 'instructions', 'long_text', 'email'];
   const supportedActivityTypes = ['training', 'livelihood', 'seminar', 'outreach', 'community_service'];
   const validSections = sections.every((section: any) => typeof section?.title === 'string' && section.title.trim() && Array.isArray(section.questions));
   const validQuestions = sections.every((section: any) => section.questions.every((question: any) =>
@@ -1625,7 +1625,7 @@ app.get('/api/forms', (_req, res) => {
 const validateFormDefinition = (form: any): string | null => {
   const validStatuses = ['draft', 'published', 'archived'];
   const validActivityTypes = ['all', 'training', 'livelihood', 'seminar', 'outreach', 'community_service'];
-  const validQuestionTypes = ['rating_scale', 'star_rating', 'single_choice', 'multiple_choice', 'dropdown', 'short_text', 'long_text', 'number', 'date', 'email', 'yes_no', 'likert_scale', 'rubric_table', 'instructions'];
+  const validQuestionTypes = ['short_text', 'paragraph', 'single_choice', 'multiple_choice', 'dropdown', 'linear_scale', 'rating_scale', 'star_rating', 'likert_scale', 'multiple_choice_grid', 'checkbox_grid', 'date', 'time', 'number', 'yes_no', 'rubric_table', 'section_title', 'instructions', 'long_text', 'email'];
   if (typeof form.title !== 'string' || !form.title.trim() || form.title.trim().length > 200) return 'A form title between 1 and 200 characters is required.';
   if (!validStatuses.includes(form.status)) return 'Choose a valid form status.';
   if (form.targetActivityType && !validActivityTypes.includes(form.targetActivityType)) return 'Choose a valid target activity type.';

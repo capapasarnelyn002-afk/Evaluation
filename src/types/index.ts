@@ -92,20 +92,26 @@ export interface EvaluationSubmission {
 
 // Evaluation Form Builder Types
 export type QuestionType =
-  | 'rating_scale'
-  | 'star_rating'
+  | 'short_text'
+  | 'paragraph'
   | 'single_choice'
   | 'multiple_choice'
   | 'dropdown'
-  | 'short_text'
-  | 'long_text'
-  | 'number'
-  | 'date'
-  | 'email'
-  | 'yes_no'
+  | 'linear_scale'
+  | 'rating_scale'
+  | 'star_rating'
   | 'likert_scale'
+  | 'multiple_choice_grid'
+  | 'checkbox_grid'
+  | 'date'
+  | 'time'
+  | 'number'
+  | 'yes_no'
   | 'rubric_table'
-  | 'instructions';
+  | 'section_title'
+  | 'instructions'
+  | 'long_text'
+  | 'email';
 
 export interface FormQuestion {
   id: string;

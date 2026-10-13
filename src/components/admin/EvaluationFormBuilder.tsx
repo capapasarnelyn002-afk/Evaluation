@@ -33,6 +33,8 @@ export const EvaluationFormBuilder: React.FC = () => {
   const [editingForm, setEditingForm] = useState<EvaluationForm | null>(null);
   const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
   const [isSavingForm, setIsSavingForm] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'failed'>('saved');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [formSaveError, setFormSaveError] = useState('');
   const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -85,6 +87,8 @@ export const EvaluationFormBuilder: React.FC = () => {
   const handleStartEditForm = (form: EvaluationForm) => {
     setEditingForm(JSON.parse(JSON.stringify(form)));
     setIsCreatingNewForm(false);
+    setHasUnsavedChanges(false);
+    setSaveStatus('saved');
     setFormSaveError('');
   };
 
@@ -108,6 +112,8 @@ export const EvaluationFormBuilder: React.FC = () => {
     setActiveFormId(newForm.id);
     setEditingForm(newForm);
     setIsCreatingNewForm(true);
+    setHasUnsavedChanges(true);
+    setSaveStatus('saving');
     setFormSaveError('');
   };
 
@@ -116,32 +122,63 @@ export const EvaluationFormBuilder: React.FC = () => {
     const formToSave = publish ? { ...editingForm, status: 'published' as const } : editingForm;
     if (!formToSave.title.trim()) {
       setFormSaveError('Enter a form title before saving.');
+      setSaveStatus('failed');
       return;
     }
     if (formToSave.status === 'published' && !formToSave.sections.some(section => section.questions.length > 0)) {
       setFormSaveError('Add at least one question before publishing this form.');
+      setSaveStatus('failed');
       return;
     }
 
     setIsSavingForm(true);
+    setSaveStatus('saving');
     setFormSaveError('');
     try {
       const savedForm = isCreatingNewForm
         ? await createForm({ ...formToSave, id: undefined })
         : await updateForm(formToSave.id, formToSave);
       setActiveFormId(savedForm.id);
-      setEditingForm(null);
+      setEditingForm({ ...savedForm, sections: savedForm.sections || [] });
       setIsCreatingNewForm(false);
+      setHasUnsavedChanges(false);
+      setSaveStatus('saved');
     } catch (cause) {
       setFormSaveError(cause instanceof Error ? cause.message : 'The form could not be saved. Your edits are still open.');
+      setSaveStatus('failed');
     } finally {
       setIsSavingForm(false);
     }
   };
 
+  useEffect(() => {
+    if (!editingForm || !hasUnsavedChanges || editingForm.status !== 'draft' || isSavingForm) return;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setSaveStatus('saving');
+        try {
+          const savedForm = isCreatingNewForm
+            ? await createForm({ ...editingForm, id: undefined })
+            : await updateForm(editingForm.id, editingForm);
+          setActiveFormId(savedForm.id);
+          setEditingForm({ ...savedForm, sections: savedForm.sections || [] });
+          setIsCreatingNewForm(false);
+          setHasUnsavedChanges(false);
+          setSaveStatus('saved');
+        } catch (cause) {
+          setFormSaveError(cause instanceof Error ? cause.message : 'The form draft could not be auto-saved.');
+          setSaveStatus('failed');
+        }
+      })();
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [editingForm, hasUnsavedChanges, isCreatingNewForm, isSavingForm]);
+
   const handleCancelEdit = () => {
     setEditingForm(null);
     setIsCreatingNewForm(false);
+    setHasUnsavedChanges(false);
+    setSaveStatus('saved');
     setFormSaveError('');
     setActiveFormId(forms[0]?.id || '');
   };
@@ -157,6 +194,8 @@ export const EvaluationFormBuilder: React.FC = () => {
       ...editingForm,
       sections: [...editingForm.sections, newSec]
     });
+    setHasUnsavedChanges(true);
+    setSaveStatus('saving');
     setNewSectionTitle('');
   };
 
@@ -166,6 +205,8 @@ export const EvaluationFormBuilder: React.FC = () => {
       ...editingForm,
       sections: editingForm.sections.filter(s => s.id !== secId)
     });
+    setHasUnsavedChanges(true);
+    setSaveStatus('saving');
   };
 
   const openAddQuestion = (secId: string) => {
@@ -255,6 +296,8 @@ export const EvaluationFormBuilder: React.FC = () => {
     });
 
     setEditingForm({ ...editingForm, sections: updatedSections });
+    setHasUnsavedChanges(true);
+    setSaveStatus('saving');
     setShowQuestionModal(false);
   };
 
@@ -268,6 +311,8 @@ export const EvaluationFormBuilder: React.FC = () => {
       };
     });
     setEditingForm({ ...editingForm, sections: updated });
+    setHasUnsavedChanges(true);
+    setSaveStatus('saving');
   };
 
   const handleMoveQuestion = (secId: string, index: number, direction: 'up' | 'down') => {
@@ -283,6 +328,8 @@ export const EvaluationFormBuilder: React.FC = () => {
       return { ...sec, questions: qs };
     });
     setEditingForm({ ...editingForm, sections: updated });
+    setHasUnsavedChanges(true);
+    setSaveStatus('saving');
   };
 
   const handleDuplicateQuestion = (secId: string, question: FormQuestion) => {
@@ -296,6 +343,8 @@ export const EvaluationFormBuilder: React.FC = () => {
       return { ...section, questions };
     });
     setEditingForm({ ...editingForm, sections: updatedSections });
+    setHasUnsavedChanges(true);
+    setSaveStatus('saving');
   };
 
   const handleMoveSection = (index: number, direction: 'up' | 'down') => {
@@ -305,61 +354,88 @@ export const EvaluationFormBuilder: React.FC = () => {
     const sections = [...editingForm.sections];
     [sections[index], sections[target]] = [sections[target], sections[index]];
     setEditingForm({ ...editingForm, sections });
+    setHasUnsavedChanges(true);
+    setSaveStatus('saving');
   };
+
+  const saveStatusLabel =
+    saveStatus === 'saving' ? 'Saving…' :
+    saveStatus === 'failed' ? 'Save failed' :
+    hasUnsavedChanges ? 'Unsaved changes' : 'Saved';
 
   return (
     <div className="space-y-6">
       
       {/* Top Banner: Form Selector & Creation Actions */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-            <Layers className="w-5 h-5 text-emerald-800" />
-            <span>Evaluation Form Builder & Rubric Customizer</span>
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Design dynamic Likert rubrics, weighted criteria, and question sections without modifying source code.
-          </p>
-        </div>
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col gap-4">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div>
+            <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+              <Layers className="w-5 h-5 text-emerald-800" />
+              <span>Evaluation Form Builder & Rubric Customizer</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Design dynamic Likert rubrics, weighted criteria, and question sections without modifying source code.
+            </p>
+          </div>
 
-        <div className="flex items-center gap-2">
-          {role === 'admin' && <button
-            type="button"
-            onClick={() => setShowImportModal(true)}
-            className="px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <FileUp className="w-4 h-4" />
-            <span>Import Excel (.xlsx)</span>
-          </button>}
-          <button
-            type="button"
-            onClick={() => setShowPreviewModal(true)}
-            disabled={!currentForm}
-            className="px-3.5 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <Eye className="w-4 h-4 text-slate-500" />
-            <span>Live Preview</span>
-          </button>
-
-          {currentForm && <>
-            <select aria-label="Print paper size" value={printPaper} onChange={event => setPrintPaper(event.target.value as 'A4' | 'Letter')} className="rounded border border-slate-300 bg-white px-2 py-2 text-xs text-slate-700">
-              <option value="A4">A4</option>
-              <option value="Letter">Letter</option>
-            </select>
-            <button type="button" onClick={() => setPrintForm(currentForm)} title="Print blank evaluation form" className="p-2 rounded border border-slate-300 text-slate-700 hover:bg-slate-50" aria-label="Print Evaluation Form">
-              <Printer className="h-4 w-4" />
+          <div className="flex flex-wrap items-center gap-2">
+            {role === 'admin' && <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className="px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileUp className="w-4 h-4" />
+              <span>Import Excel (.xlsx)</span>
+            </button>}
+            <button
+              type="button"
+              onClick={() => setShowPreviewModal(true)}
+              disabled={!currentForm}
+              className="px-3.5 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Eye className="w-4 h-4 text-slate-500" />
+              <span>Live Preview</span>
             </button>
-          </>}
 
-          <button
-            onClick={handleCreateNewForm}
-            className="px-4 py-2 rounded-lg text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
-            style={{ backgroundColor: theme.primaryColor }}
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create New Form</span>
-          </button>
+            {currentForm && <>
+              <select aria-label="Print paper size" value={printPaper} onChange={event => setPrintPaper(event.target.value as 'A4' | 'Letter')} className="rounded border border-slate-300 bg-white px-2 py-2 text-xs text-slate-700">
+                <option value="A4">A4</option>
+                <option value="Letter">Letter</option>
+              </select>
+              <button type="button" onClick={() => setPrintForm(currentForm)} title="Print blank evaluation form" className="p-2 rounded border border-slate-300 text-slate-700 hover:bg-slate-50" aria-label="Print Evaluation Form">
+                <Printer className="h-4 w-4" />
+              </button>
+            </>}
+
+            <button
+              onClick={handleCreateNewForm}
+              className="px-4 py-2 rounded-lg text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+              style={{ backgroundColor: theme.primaryColor }}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create New Form</span>
+            </button>
+          </div>
         </div>
+
+        {editingForm && (
+          <div className="flex flex-col gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-700">
+              <button type="button" className="px-2.5 py-1.5 rounded border border-slate-300 bg-white text-slate-700">Back to Form Builder</button>
+              <button type="button" className="px-2.5 py-1.5 rounded border border-slate-300 bg-white text-slate-700">Theme</button>
+              <button type="button" className="px-2.5 py-1.5 rounded border border-slate-300 bg-white text-slate-700">Settings</button>
+              <button type="button" onClick={() => setShowPreviewModal(true)} className="px-2.5 py-1.5 rounded border border-slate-300 bg-white text-slate-700">Preview</button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-700">
+              <span className="font-semibold">Save status:</span>
+              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-bold ${saveStatus === 'saving' ? 'bg-amber-100 text-amber-800' : saveStatus === 'failed' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                <span className="h-2 w-2 rounded-full bg-current" />
+                {saveStatusLabel}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {!currentForm && (
@@ -421,32 +497,44 @@ export const EvaluationFormBuilder: React.FC = () => {
                   <input
                     type="text"
                     value={editingForm.title}
-                    onChange={(e) => setEditingForm({ ...editingForm, title: e.target.value })}
+                    onChange={(e) => {
+                      setEditingForm({ ...editingForm, title: e.target.value });
+                      setHasUnsavedChanges(true);
+                      setSaveStatus('saving');
+                    }}
                     className="w-full font-bold text-lg text-slate-900 border border-slate-300 rounded-lg p-2"
                   />
                   <textarea
                     rows={2}
                     value={editingForm.description}
-                    onChange={(e) => setEditingForm({ ...editingForm, description: e.target.value })}
+                    onChange={(e) => {
+                      setEditingForm({ ...editingForm, description: e.target.value });
+                      setHasUnsavedChanges(true);
+                      setSaveStatus('saving');
+                    }}
                     placeholder="Form description..."
                     className="w-full text-xs text-slate-600 border border-slate-300 rounded-lg p-2"
                   />
                   <textarea
                     rows={2}
                     value={editingForm.instructions || ''}
-                    onChange={(e) => setEditingForm({ ...editingForm, instructions: e.target.value })}
+                    onChange={(e) => {
+                      setEditingForm({ ...editingForm, instructions: e.target.value });
+                      setHasUnsavedChanges(true);
+                      setSaveStatus('saving');
+                    }}
                     placeholder="Instructions for respondents..."
                     className="w-full text-xs text-slate-600 border border-slate-300 rounded-lg p-2"
                   />
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <label className="text-[11px] font-semibold text-slate-600">Respondent group
-                      <input value={editingForm.targetRespondent || ''} onChange={event => setEditingForm({ ...editingForm, targetRespondent: event.target.value })} placeholder="e.g. Activity participants" className="mt-1 w-full rounded border border-slate-300 p-2 font-normal" />
+                      <input value={editingForm.targetRespondent || ''} onChange={event => { setEditingForm({ ...editingForm, targetRespondent: event.target.value }); setHasUnsavedChanges(true); setSaveStatus('saving'); }} placeholder="e.g. Activity participants" className="mt-1 w-full rounded border border-slate-300 p-2 font-normal" />
                     </label>
                     <label className="text-[11px] font-semibold text-slate-600">Evaluation purpose
-                      <input value={editingForm.purpose || ''} onChange={event => setEditingForm({ ...editingForm, purpose: event.target.value })} placeholder="What this form evaluates" className="mt-1 w-full rounded border border-slate-300 p-2 font-normal" />
+                      <input value={editingForm.purpose || ''} onChange={event => { setEditingForm({ ...editingForm, purpose: event.target.value }); setHasUnsavedChanges(true); setSaveStatus('saving'); }} placeholder="What this form evaluates" className="mt-1 w-full rounded border border-slate-300 p-2 font-normal" />
                     </label>
                     <label className="text-[11px] font-semibold text-slate-600">Associated activity
-                      <select value={editingForm.activityId || ''} onChange={event => setEditingForm({ ...editingForm, activityId: event.target.value })} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-normal">
+                      <select value={editingForm.activityId || ''} onChange={event => { setEditingForm({ ...editingForm, activityId: event.target.value }); setHasUnsavedChanges(true); setSaveStatus('saving'); }} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-normal">
                         <option value="">Not assigned to one activity</option>
                         {activities.map(activity => <option key={activity.id} value={activity.id}>{activity.title}</option>)}
                       </select>
@@ -457,7 +545,11 @@ export const EvaluationFormBuilder: React.FC = () => {
                       <span className="font-semibold text-slate-700">Status:</span>
                       <select
                         value={editingForm.status}
-                        onChange={(e) => setEditingForm({ ...editingForm, status: e.target.value as any })}
+                        onChange={(e) => {
+                          setEditingForm({ ...editingForm, status: e.target.value as any });
+                          setHasUnsavedChanges(true);
+                          setSaveStatus('saving');
+                        }}
                         className="border border-slate-300 rounded px-2 py-1 text-xs"
                       >
                         <option value="draft">Draft</option>
@@ -470,7 +562,11 @@ export const EvaluationFormBuilder: React.FC = () => {
                       <span className="font-semibold text-slate-700">Target Type:</span>
                       <select
                         value={editingForm.targetActivityType || 'all'}
-                        onChange={(e) => setEditingForm({ ...editingForm, targetActivityType: e.target.value as any })}
+                        onChange={(e) => {
+                          setEditingForm({ ...editingForm, targetActivityType: e.target.value as any });
+                          setHasUnsavedChanges(true);
+                          setSaveStatus('saving');
+                        }}
                         className="border border-slate-300 rounded px-2 py-1 text-xs"
                       >
                         <option value="all">Universal / All Activities</option>
