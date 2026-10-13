@@ -574,29 +574,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createForm = async (formData: Partial<EvaluationForm>): Promise<EvaluationForm> => {
     const res = await fetch('/api/forms', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.role },
       body: JSON.stringify(formData)
     });
-    const created = await res.json();
+    const created = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(created.error || 'The evaluation form could not be created.');
     setForms(prev => [created, ...prev]);
+    if (created.activityId) setActivities(prev => prev.map(activity => activity.id === created.activityId ? { ...activity, assignedFormId: created.id } : activity));
     addToast({ type: 'success', title: 'Evaluation Form Created', description: `Rubric "${created.title}" ready.` });
     return created;
   };
 
   const updateForm = async (id: string, formData: Partial<EvaluationForm>): Promise<EvaluationForm> => {
+    const previousForm = forms.find(form => form.id === id);
     const res = await fetch(`/api/forms/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.role },
       body: JSON.stringify(formData)
     });
-    const updated = await res.json();
+    const updated = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(updated.error || 'The evaluation form could not be updated.');
     setForms(prev => prev.map(f => f.id === id ? updated : f));
+    if (previousForm?.activityId && previousForm.activityId !== updated.activityId) {
+      setActivities(prev => prev.map(activity => activity.id === previousForm.activityId && activity.assignedFormId === id ? { ...activity, assignedFormId: undefined } : activity));
+    }
+    if (updated.activityId) setActivities(prev => prev.map(activity => activity.id === updated.activityId ? { ...activity, assignedFormId: id } : activity));
     addToast({ type: 'success', title: 'Form Rubric Updated', description: `Updated questions in "${updated.title}".` });
     return updated;
   };
 
   const deleteForm = async (id: string): Promise<boolean> => {
-    const res = await fetch(`/api/forms/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/forms/${id}`, { method: 'DELETE', headers: { 'X-User-Role': currentUser.role } });
     if (res.ok) {
       setForms(prev => prev.filter(f => f.id !== id));
       addToast({ type: 'info', title: 'Form Deleted', description: 'Evaluation form removed.' });
@@ -606,8 +614,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const duplicateForm = async (id: string): Promise<EvaluationForm> => {
-    const res = await fetch(`/api/forms/${id}/duplicate`, { method: 'POST' });
-    const cloned = await res.json();
+    const res = await fetch(`/api/forms/${id}/duplicate`, { method: 'POST', headers: { 'X-User-Role': currentUser.role } });
+    const cloned = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(cloned.error || 'The evaluation form could not be duplicated.');
     setForms(prev => [cloned, ...prev]);
     addToast({ type: 'success', title: 'Form Cloned', description: `Created new draft template "${cloned.title}".` });
     return cloned;

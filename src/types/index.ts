@@ -101,10 +101,15 @@ export type QuestionType =
   | 'long_text'
   | 'number'
   | 'date'
-  | 'email';
+  | 'email'
+  | 'yes_no'
+  | 'likert_scale'
+  | 'rubric_table'
+  | 'instructions';
 
 export interface FormQuestion {
   id: string;
+  criterionName?: string;
   label: string;
   description?: string;
   type: QuestionType;
@@ -114,6 +119,10 @@ export interface FormQuestion {
   scaleMax?: number;
   scaleMinLabel?: string;
   scaleMaxLabel?: string;
+  scaleLabels?: string[];
+  criteria?: string[];
+  minSelections?: number;
+  maxSelections?: number;
   weight?: number;
 }
 
@@ -132,6 +141,9 @@ export interface EvaluationForm {
   status: 'draft' | 'published' | 'archived';
   version: number;
   targetActivityType?: ActivityType | 'all';
+  activityId?: string;
+  targetRespondent?: string;
+  purpose?: string;
   originalFileName?: string;
   sections: FormSection[];
   createdAt: string;

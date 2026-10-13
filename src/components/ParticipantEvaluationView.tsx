@@ -26,22 +26,29 @@ import {
 const ImportedQuestionInput: React.FC<{
   question: FormQuestion;
   number: number;
-  value?: string | number | string[];
-  onChange: (value: string | number | string[]) => void;
+  value?: string | number | string[] | Record<string, string | number>;
+  onChange: (value: string | number | string[] | Record<string, string | number>) => void;
 }> = ({ question, number, value, onChange }) => {
   const inputId = `answer-${question.id}`;
   const selectedValues = Array.isArray(value) ? value : [];
+  const rubricValues = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, string | number> : {};
   const scaleValues = Array.from({ length: Math.min(10, Math.max(2, (question.scaleMax || 5) - (question.scaleMin || 1) + 1)) }, (_, index) => (question.scaleMin || 1) + index);
+
+  if (question.type === 'instructions') return <div className="rounded bg-emerald-50 px-3 py-2 text-xs text-slate-700">{question.description || question.label}</div>;
 
   return (
     <fieldset className="space-y-2">
       <legend className="text-xs font-bold text-slate-900">{number}. {question.label}{question.required && <span className="text-rose-600"> *</span>}</legend>
       {question.description && <p className="text-xs text-slate-500">{question.description}</p>}
-      {(question.type === 'rating_scale' || question.type === 'star_rating' || question.type === 'single_choice') && (
+      {(question.type === 'rating_scale' || question.type === 'star_rating' || question.type === 'likert_scale' || question.type === 'single_choice' || question.type === 'yes_no') && (
         <div className="flex flex-wrap gap-3" role="radiogroup" aria-label={question.label}>
-          {(question.type === 'single_choice' ? (question.options || []).map((option, index) => ({ value: option, label: option, key: `choice-${index}` })) : scaleValues.map(scale => ({ value: scale, label: String(scale), key: `scale-${scale}` }))).map((option, index) => (
+          {(question.type === 'single_choice' || question.type === 'yes_no'
+            ? (question.type === 'yes_no' ? ['Yes', 'No'] : question.options || []).map((option, index) => ({ value: option, label: option, key: `choice-${index}` }))
+            : question.type === 'likert_scale'
+              ? (question.scaleLabels || []).map((label, index) => ({ value: index + (question.scaleMin || 1), label, key: `likert-${index}` }))
+              : scaleValues.map(scale => ({ value: scale, label: String(scale), key: `scale-${scale}` }))).map(option => (
             <label key={option.key} className="inline-flex items-center gap-2 rounded border border-slate-200 px-3 py-2 text-xs text-slate-800">
-              <input type="radio" name={question.id} value={String(option.value)} required={question.required} checked={String(value ?? '') === String(option.value)} onChange={() => onChange(question.type === 'single_choice' ? String(option.value) : Number(option.value))} />
+              <input type="radio" name={question.id} value={String(option.value)} required={question.required} checked={String(value ?? '') === String(option.value)} onChange={() => onChange(['single_choice', 'yes_no'].includes(question.type) ? String(option.value) : Number(option.value))} />
               {option.label}
             </label>
           ))}
@@ -50,11 +57,23 @@ const ImportedQuestionInput: React.FC<{
       {question.type === 'multiple_choice' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {(question.options || []).map((option, index) => <label key={option} className="inline-flex items-center gap-2 rounded border border-slate-200 px-3 py-2 text-xs text-slate-800">
-            <input type="checkbox" required={question.required && index === 0} checked={selectedValues.includes(option)} onChange={event => onChange(event.target.checked ? [...selectedValues, option] : selectedValues.filter(item => item !== option))} />
+            <input type="checkbox" checked={selectedValues.includes(option)} onChange={event => onChange(event.target.checked ? [...selectedValues, option] : selectedValues.filter(item => item !== option))} />
             {option}
           </label>)}
         </div>
       )}
+      {question.type === 'multiple_choice' && question.required && selectedValues.length < (question.minSelections || 1) && <p className="text-[11px] text-rose-700">Select at least {question.minSelections || 1} option(s).</p>}
+      {question.type === 'rubric_table' && <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-xs">
+          <thead><tr><th className="border border-slate-200 p-2 text-left">Criterion</th>{(question.options || []).map(option => <th key={option} className="border border-slate-200 p-2 text-center">{option}</th>)}</tr></thead>
+          <tbody>{(question.criteria || []).map(criterion => <tr key={criterion}>
+            <th scope="row" className="border border-slate-200 p-2 text-left">{criterion}</th>
+            {(question.options || []).map((option, optionIndex) => <td key={option} className="border border-slate-200 p-2 text-center">
+              <input type="radio" required={question.required && optionIndex === 0 && rubricValues[criterion] === undefined} name={`${question.id}-${criterion}`} aria-label={`${criterion}: ${option}`} checked={Number(rubricValues[criterion]) === (question.scaleMin || 1) + optionIndex} onChange={() => onChange({ ...rubricValues, [criterion]: (question.scaleMin || 1) + optionIndex })} />
+            </td>)}
+          </tr>)}</tbody>
+        </table>
+      </div>}
       {question.type === 'dropdown' && <select id={inputId} value={String(value ?? '')} required={question.required} onChange={event => onChange(event.target.value)} className="w-full rounded border border-slate-300 p-2.5 text-xs">
         <option value="">Select an answer</option>{(question.options || []).map(option => <option key={option} value={option}>{option}</option>)}
       </select>}
@@ -62,13 +81,13 @@ const ImportedQuestionInput: React.FC<{
         id={inputId}
         type={question.type === 'short_text' ? 'text' : question.type}
         required={question.required}
-        value={value ?? ''}
+        value={value && typeof value === 'object' && !Array.isArray(value) ? '' : value ?? ''}
         onChange={event => onChange(question.type === 'number' ? (event.target.value === '' ? '' : Number(event.target.value)) : event.target.value)}
         className="w-full rounded border border-slate-300 p-2.5 text-xs"
         placeholder={question.type === 'short_text' ? 'Enter your response' : undefined}
       />}
       {question.type === 'long_text' && <textarea id={inputId} rows={3} required={question.required} value={String(value ?? '')} onChange={event => onChange(event.target.value)} className="w-full rounded border border-slate-300 p-2.5 text-xs" placeholder="Write your response" />}
-      {(question.type === 'rating_scale' || question.type === 'star_rating') && <p className="flex justify-between text-[10px] text-slate-500"><span>{question.scaleMinLabel || 'Lowest'}</span><span>{question.scaleMaxLabel || 'Highest'}</span></p>}
+      {(question.type === 'rating_scale' || question.type === 'star_rating' || question.type === 'likert_scale') && <p className="flex justify-between text-[10px] text-slate-500"><span>{question.scaleMinLabel || 'Lowest'}</span><span>{question.scaleMaxLabel || 'Highest'}</span></p>}
     </fieldset>
   );
 };
@@ -96,7 +115,7 @@ export const ParticipantEvaluationView: React.FC = () => {
   const [verificationMethod, setVerificationMethod] = useState<'student_id' | 'qr_code' | 'sms_code' | 'signed_attendance'>('student_id');
   const [verificationCode, setVerificationCode] = useState('');
   const [consentAccepted, setConsentAccepted] = useState(false);
-  const [customAnswers, setCustomAnswers] = useState<Record<string, string | number | string[]>>({});
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string | number | string[] | Record<string, string | number>>>({});
 
   useEffect(() => {
     setCustomAnswers({});
@@ -173,9 +192,14 @@ export const ParticipantEvaluationView: React.FC = () => {
       specificRatings: assignedForm
         ? Object.fromEntries(assignedForm.sections.flatMap(section => section.questions).flatMap(question => {
             const answer = customAnswers[question.id];
-            if (!['rating_scale', 'star_rating'].includes(question.type) || answer === undefined || answer === '') return [];
-            const value = Number(answer);
-            return Number.isFinite(value) ? [[question.id, value]] : [];
+            if (['rating_scale', 'star_rating', 'likert_scale'].includes(question.type) && answer !== undefined && answer !== '') {
+              const value = Number(answer);
+              return Number.isFinite(value) ? [[question.id, value]] : [];
+            }
+            if (question.type === 'rubric_table' && answer && typeof answer === 'object' && !Array.isArray(answer)) {
+              return Object.entries(answer).map(([criterion, score]) => [`${question.id}:${criterion}`, Number(score)]);
+            }
+            return [];
           }))
         : specificRatings,
       customAnswers: assignedForm ? customAnswers : undefined,

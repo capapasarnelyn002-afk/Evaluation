@@ -618,6 +618,7 @@ app.post('/api/evaluations', (req, res) => {
   if (!activity) return res.status(404).json({ error: 'Evaluation activity not found.' });
   let submittedForm: any;
   let submittedCoreRatings = payload.coreRatings || {};
+  let submittedWeightedMean: number | undefined;
   if (payload.formId) {
     submittedForm = evaluationForms.find(form => form.id === payload.formId);
     if (!submittedForm) return res.status(404).json({ error: 'Evaluation form not found.' });
@@ -640,12 +641,23 @@ app.post('/api/evaluations', (req, res) => {
       if (question.required && isEmpty) return res.status(400).json({ error: `A response is required for "${question.label}".` });
       if (isEmpty) continue;
       if (['single_choice', 'dropdown'].includes(question.type) && !(question.options || []).includes(answer)) return res.status(400).json({ error: `The response for "${question.label}" is not an allowed option.` });
+      if (question.type === 'yes_no' && !['Yes', 'No'].includes(answer)) return res.status(400).json({ error: `The response for "${question.label}" must be Yes or No.` });
       if (question.type === 'multiple_choice' && (!Array.isArray(answer) || answer.some(option => !(question.options || []).includes(option)))) return res.status(400).json({ error: `The response for "${question.label}" contains an invalid option.` });
-      if (['rating_scale', 'star_rating'].includes(question.type)) {
+      if (question.type === 'multiple_choice' && ((question.minSelections !== undefined && answer.length < question.minSelections) || (question.maxSelections !== undefined && answer.length > question.maxSelections))) return res.status(400).json({ error: `The response for "${question.label}" has an invalid number of selections.` });
+      if (['rating_scale', 'star_rating', 'likert_scale'].includes(question.type)) {
         const min = question.scaleMin ?? 1;
         const max = question.scaleMax ?? 5;
         if (!Number.isInteger(answer) || answer < min || answer > max) return res.status(400).json({ error: `The response for "${question.label}" must be a whole number from ${min} to ${max}.` });
       }
+      if (question.type === 'rubric_table') {
+        if (!answer || typeof answer !== 'object' || Array.isArray(answer)) return res.status(400).json({ error: `The response for "${question.label}" must include rubric ratings.` });
+        const criteria: string[] = question.criteria || [];
+        if (Object.keys(answer).some(criterion => !criteria.includes(criterion))) return res.status(400).json({ error: `The response for "${question.label}" includes an unknown criterion.` });
+        const min = question.scaleMin ?? 1;
+        const max = question.scaleMax ?? 5;
+        if (criteria.some(criterion => question.required && !Number.isInteger(answer[criterion])) || Object.values(answer).some((score: any) => !Number.isInteger(score) || score < min || score > max)) return res.status(400).json({ error: `The response for "${question.label}" must rate every criterion from ${min} to ${max}.` });
+      }
+      if (question.type === 'instructions') continue;
       if (question.type === 'number' && (typeof answer !== 'number' || !Number.isFinite(answer))) return res.status(400).json({ error: `The response for "${question.label}" must be a number.` });
       if (['short_text', 'long_text'].includes(question.type) && typeof answer !== 'string') return res.status(400).json({ error: `The response for "${question.label}" must be text.` });
       if (typeof answer === 'string' && answer.length > 10000) return res.status(400).json({ error: `The response for "${question.label}" is too long.` });
@@ -658,8 +670,31 @@ app.post('/api/evaluations', (req, res) => {
     }
     submittedSpecificRatings = Object.fromEntries(questions.flatMap((question: any) => {
       const answer = answers[question.id];
-      return ['rating_scale', 'star_rating'].includes(question.type) && Number.isInteger(answer) ? [[question.id, answer]] : [];
+      if (['rating_scale', 'star_rating', 'likert_scale'].includes(question.type) && Number.isInteger(answer)) return [[question.id, answer]];
+      if (question.type === 'rubric_table' && answer && typeof answer === 'object') return Object.entries(answer).map(([criterion, score]) => [`${question.id}:${criterion}`, score]);
+      return [];
     }));
+    let weightedScoreTotal = 0;
+    let totalWeight = 0;
+    for (const question of questions) {
+      const answer = answers[question.id];
+      if (['rating_scale', 'star_rating', 'likert_scale'].includes(question.type) && Number.isInteger(answer)) {
+        const weight = question.weight ?? 1;
+        weightedScoreTotal += answer * weight;
+        totalWeight += weight;
+      } else if (question.type === 'rubric_table' && answer && typeof answer === 'object') {
+        const criteria: string[] = question.criteria || [];
+        const weightPerCriterion = (question.weight ?? criteria.length) / Math.max(criteria.length, 1);
+        for (const criterion of criteria) {
+          const score = answer[criterion];
+          if (Number.isInteger(score)) {
+            weightedScoreTotal += score * weightPerCriterion;
+            totalWeight += weightPerCriterion;
+          }
+        }
+      }
+    }
+    submittedWeightedMean = totalWeight > 0 ? Number((weightedScoreTotal / totalWeight).toFixed(2)) : 0;
     submittedCoreRatings = {};
   }
 
@@ -687,9 +722,11 @@ app.post('/api/evaluations', (req, res) => {
   const coreVals = Object.values(submittedCoreRatings) as number[];
   const specVals = Object.values(submittedSpecificRatings) as number[];
   const allRatings = [...coreVals, ...specVals];
-  const meanRating = allRatings.length > 0
+  const meanRating = submittedForm
+    ? submittedWeightedMean || 0
+    : allRatings.length > 0
     ? Number((allRatings.reduce((a, b) => a + b, 0) / allRatings.length).toFixed(2))
-    : submittedForm ? 0 : 4.0;
+    : 4.0;
 
   const controlNumber = payload.controlNumber || `SLSU-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -1468,12 +1505,13 @@ app.post('/api/imports/form', (req, res) => {
   if (!Array.isArray(sections) || sections.length === 0 || sections.length > 100) return res.status(400).json({ error: 'The form needs between 1 and 100 sections.' });
 
   const questionCount = sections.reduce((count: number, section: any) => count + (Array.isArray(section?.questions) ? section.questions.length : 0), 0);
-  const supportedTypes = ['rating_scale', 'star_rating', 'single_choice', 'multiple_choice', 'dropdown', 'short_text', 'long_text', 'number', 'date', 'email'];
+  const supportedTypes = ['rating_scale', 'star_rating', 'single_choice', 'multiple_choice', 'dropdown', 'short_text', 'long_text', 'number', 'date', 'email', 'yes_no', 'likert_scale', 'rubric_table', 'instructions'];
   const validSections = sections.every((section: any) => typeof section?.title === 'string' && section.title.trim() && Array.isArray(section.questions));
   const validQuestions = sections.every((section: any) => section.questions.every((question: any) =>
     typeof question?.label === 'string' && question.label.trim() && supportedTypes.includes(question.type) && typeof question.required === 'boolean' &&
-    (!['single_choice', 'multiple_choice', 'dropdown'].includes(question.type) || (Array.isArray(question.options) && question.options.length >= 2 && question.options.every((option: unknown) => typeof option === 'string' && option.trim()))) &&
-    (question.type !== 'rating_scale' || (Number.isInteger(question.scaleMin) && Number.isInteger(question.scaleMax) && question.scaleMax > question.scaleMin && question.scaleMax - question.scaleMin <= 9))
+    (!['single_choice', 'multiple_choice', 'dropdown', 'rubric_table'].includes(question.type) || (Array.isArray(question.options) && question.options.length >= 2 && question.options.every((option: unknown) => typeof option === 'string' && option.trim()))) &&
+    (question.type !== 'rubric_table' || (Array.isArray(question.criteria) && question.criteria.length > 0)) &&
+    (!['rating_scale', 'star_rating', 'likert_scale', 'rubric_table'].includes(question.type) || (Number.isInteger(question.scaleMin) && Number.isInteger(question.scaleMax) && question.scaleMax > question.scaleMin && question.scaleMax - question.scaleMin <= 9))
   ));
   if (!validSections || !validQuestions || questionCount < 1 || questionCount > 300) return res.status(400).json({ error: 'The form contains invalid sections or questions. Check labels, field types, options, rating ranges, and the 300-question limit.' });
 
@@ -1516,13 +1554,17 @@ app.post('/api/imports/evaluation', (req, res) => {
     return res.status(400).json({ error: 'The evaluation needs between 1 and 100 sections.' });
   }
   const questionCount = sections.reduce((count: number, section: any) => count + (Array.isArray(section?.questions) ? section.questions.length : 0), 0);
-  const supportedTypes = ['rating_scale', 'star_rating', 'single_choice', 'multiple_choice', 'dropdown', 'short_text', 'long_text', 'number', 'date', 'email'];
+  const supportedTypes = ['rating_scale', 'star_rating', 'single_choice', 'multiple_choice', 'dropdown', 'short_text', 'long_text', 'number', 'date', 'email', 'yes_no', 'likert_scale', 'rubric_table', 'instructions'];
   const supportedActivityTypes = ['training', 'livelihood', 'seminar', 'outreach', 'community_service'];
   const validSections = sections.every((section: any) => typeof section?.title === 'string' && section.title.trim() && Array.isArray(section.questions));
   const validQuestions = sections.every((section: any) => section.questions.every((question: any) =>
     typeof question?.label === 'string' && question.label.trim() && supportedTypes.includes(question.type) && typeof question.required === 'boolean' &&
-    (!['single_choice', 'multiple_choice', 'dropdown'].includes(question.type) || (Array.isArray(question.options) && question.options.length >= 2 && question.options.every((option: unknown) => typeof option === 'string' && option.trim()))) &&
-    (question.type !== 'rating_scale' || (Number.isInteger(question.scaleMin) && Number.isInteger(question.scaleMax) && question.scaleMax > question.scaleMin && question.scaleMax - question.scaleMin <= 9))
+    (!['single_choice', 'multiple_choice', 'dropdown', 'rubric_table'].includes(question.type) || (Array.isArray(question.options) && question.options.length >= 2 && question.options.every((option: unknown) => typeof option === 'string' && option.trim()))) &&
+    (question.type !== 'rubric_table' || (Array.isArray(question.criteria) && question.criteria.length > 0)) &&
+    (!['rating_scale', 'star_rating', 'likert_scale', 'rubric_table'].includes(question.type) || (Number.isInteger(question.scaleMin) && Number.isInteger(question.scaleMax) && question.scaleMax > question.scaleMin && question.scaleMax - question.scaleMin <= 9)) &&
+    (question.type !== 'likert_scale' || (Array.isArray(question.scaleLabels) && question.scaleLabels.length === question.scaleMax - question.scaleMin + 1)) &&
+    (question.type !== 'rubric_table' || question.options.length === question.scaleMax - question.scaleMin + 1) &&
+    (question.type !== 'instructions' || !question.required)
   ));
   if (!validSections || !validQuestions || (activityType !== undefined && !supportedActivityTypes.includes(activityType)) || questionCount < 1 || questionCount > 300) {
     return res.status(400).json({ error: 'The form contains an invalid section or question. Check labels, field types, required flags, and the 300-question limit.' });
@@ -1580,23 +1622,76 @@ app.get('/api/forms', (_req, res) => {
   res.json(evaluationForms);
 });
 
+const validateFormDefinition = (form: any): string | null => {
+  const validStatuses = ['draft', 'published', 'archived'];
+  const validActivityTypes = ['all', 'training', 'livelihood', 'seminar', 'outreach', 'community_service'];
+  const validQuestionTypes = ['rating_scale', 'star_rating', 'single_choice', 'multiple_choice', 'dropdown', 'short_text', 'long_text', 'number', 'date', 'email', 'yes_no', 'likert_scale', 'rubric_table', 'instructions'];
+  if (typeof form.title !== 'string' || !form.title.trim() || form.title.trim().length > 200) return 'A form title between 1 and 200 characters is required.';
+  if (!validStatuses.includes(form.status)) return 'Choose a valid form status.';
+  if (form.targetActivityType && !validActivityTypes.includes(form.targetActivityType)) return 'Choose a valid target activity type.';
+  if (typeof form.description === 'string' && form.description.length > 3000) return 'Form description cannot exceed 3000 characters.';
+  if (typeof form.instructions === 'string' && form.instructions.length > 3000) return 'Form instructions cannot exceed 3000 characters.';
+  if (!Array.isArray(form.sections) || form.sections.length > 100) return 'A form can contain at most 100 sections.';
+  let questionCount = 0;
+  const questionIds = new Set<string>();
+  for (const section of form.sections) {
+    if (typeof section?.title !== 'string' || !section.title.trim() || section.title.length > 200 || !Array.isArray(section.questions)) return 'Every section needs a title and a question list.';
+    for (const question of section.questions) {
+      questionCount += 1;
+      if (typeof question?.id !== 'string' || !question.id || questionIds.has(question.id)) return 'Question IDs must be present and unique within a form.';
+      questionIds.add(question.id);
+      if (typeof question.label !== 'string' || !question.label.trim() || question.label.length > 1000 || !validQuestionTypes.includes(question.type) || typeof question.required !== 'boolean') return 'A question has an invalid label, field type, or required setting.';
+      if (question.description && (typeof question.description !== 'string' || question.description.length > 2000)) return 'Question help text cannot exceed 2000 characters.';
+      if (['single_choice', 'multiple_choice', 'dropdown', 'rubric_table'].includes(question.type)) {
+        if (!Array.isArray(question.options) || question.options.length < 2 || question.options.length > 100 || question.options.some((option: unknown) => typeof option !== 'string' || !option.trim() || option.length > 300)) return `"${question.label}" needs between 2 and 100 valid answer options.`;
+      }
+      if (question.type === 'rubric_table' && (!Array.isArray(question.criteria) || question.criteria.length < 1 || question.criteria.length > 100 || question.criteria.some((criterion: unknown) => typeof criterion !== 'string' || !criterion.trim()))) return `"${question.label}" needs at least one rubric criterion.`;
+      if (question.type === 'multiple_choice' && ((question.minSelections !== undefined && (!Number.isInteger(question.minSelections) || question.minSelections < 0)) || (question.maxSelections !== undefined && (!Number.isInteger(question.maxSelections) || question.maxSelections < 1)) || (question.minSelections !== undefined && question.maxSelections !== undefined && question.minSelections > question.maxSelections) || (question.maxSelections !== undefined && question.maxSelections > (question.options || []).length))) return `"${question.label}" has invalid selection limits.`;
+      if (['rating_scale', 'star_rating', 'likert_scale', 'rubric_table'].includes(question.type)) {
+        const minimum = question.scaleMin ?? 1;
+        const maximum = question.scaleMax ?? 5;
+        if (!Number.isInteger(minimum) || !Number.isInteger(maximum) || maximum <= minimum || maximum - minimum > 9) return `"${question.label}" needs a valid rating range with 2 to 10 values.`;
+      }
+      if (question.type === 'likert_scale' && (!Array.isArray(question.scaleLabels) || question.scaleLabels.length !== (question.scaleMax ?? 5) - (question.scaleMin ?? 1) + 1 || question.scaleLabels.some((label: unknown) => typeof label !== 'string' || !label.trim()))) return `"${question.label}" needs a label for every Likert rating.`;
+      if (question.type === 'rubric_table' && question.options.length !== (question.scaleMax ?? 5) - (question.scaleMin ?? 1) + 1) return `"${question.label}" needs a label for every rubric score.`;
+      if (question.weight !== undefined && (!Number.isFinite(question.weight) || question.weight < 0 || question.weight > 100)) return `"${question.label}" has an invalid weight.`;
+      if (question.type === 'instructions' && question.required) return 'Instruction-only fields cannot be required responses.';
+    }
+  }
+  if (questionCount > 300) return 'A form cannot contain more than 300 questions.';
+  if (form.status === 'published' && questionCount === 0) return 'Add at least one question before publishing a form.';
+  return null;
+};
+
 app.post('/api/forms', (req, res) => {
+  if (req.headers['x-user-role'] !== 'admin') return res.status(403).json({ error: 'Only administrators can create forms.' });
+  const payload = { ...req.body, status: req.body.status || 'draft', sections: req.body.sections || [] };
+  const validationError = validateFormDefinition(payload);
+  if (validationError) return res.status(400).json({ error: validationError });
+  if (payload.activityId && !activities.some(activity => activity.id === payload.activityId)) return res.status(404).json({ error: 'Associated activity not found.' });
+
+  const now = new Date().toISOString();
   const newForm = {
-    id: `form-${Date.now()}`,
-    title: req.body.title || 'Untitled Evaluation Form',
-    description: req.body.description || '',
-    instructions: req.body.instructions || '',
-    status: req.body.status || 'draft',
+    id: `form-${randomUUID()}`,
+    title: payload.title.trim(),
+    description: payload.description || '',
+    instructions: payload.instructions || '',
+    status: payload.status,
     version: 1,
-    targetActivityType: req.body.targetActivityType || 'all',
-    sections: req.body.sections || [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    targetActivityType: payload.targetActivityType || 'all',
+    activityId: payload.activityId || '',
+    targetRespondent: typeof payload.targetRespondent === 'string' ? payload.targetRespondent.slice(0, 200) : '',
+    purpose: typeof payload.purpose === 'string' ? payload.purpose.slice(0, 1000) : '',
+    originalFileName: typeof payload.originalFileName === 'string' ? payload.originalFileName.slice(0, 255) : undefined,
+    sections: payload.sections,
+    createdAt: now,
+    updatedAt: now
   };
   evaluationForms.unshift(newForm);
+  if (newForm.activityId) activities.find(activity => activity.id === newForm.activityId)!.assignedFormId = newForm.id;
   auditLogs.unshift({
-    id: `log-${Date.now()}`,
-    timestamp: new Date().toISOString(),
+    id: `log-${randomUUID()}`,
+    timestamp: now,
     adminName: 'Dr. Jane C. Monfort',
     action: 'FORM_CREATED',
     resourceId: newForm.id,
@@ -1606,19 +1701,37 @@ app.post('/api/forms', (req, res) => {
 });
 
 app.put('/api/forms/:id', (req, res) => {
+  if (req.headers['x-user-role'] !== 'admin') return res.status(403).json({ error: 'Only administrators can edit or publish forms.' });
   const idx = evaluationForms.findIndex(f => f.id === req.params.id);
   if (idx === -1) {
     res.status(404).json({ error: 'Form not found' });
     return;
   }
-  evaluationForms[idx] = {
-    ...evaluationForms[idx],
-    ...req.body,
-    updatedAt: new Date().toISOString(),
-    version: (evaluationForms[idx].version || 1) + 1
+  const existingForm = evaluationForms[idx];
+  const payload = req.body || {};
+  const updatedForm = {
+    ...existingForm,
+    title: payload.title ?? existingForm.title,
+    description: payload.description ?? existingForm.description,
+    instructions: payload.instructions ?? existingForm.instructions,
+    status: payload.status ?? existingForm.status,
+    targetActivityType: payload.targetActivityType ?? existingForm.targetActivityType,
+    activityId: payload.activityId ?? existingForm.activityId,
+    targetRespondent: payload.targetRespondent ?? existingForm.targetRespondent,
+    purpose: payload.purpose ?? existingForm.purpose,
+    sections: payload.sections ?? existingForm.sections,
   };
+  const validationError = validateFormDefinition(updatedForm);
+  if (validationError) return res.status(400).json({ error: validationError });
+  if (updatedForm.activityId && !activities.some(activity => activity.id === updatedForm.activityId)) return res.status(404).json({ error: 'Associated activity not found.' });
+  if (existingForm.activityId && existingForm.activityId !== updatedForm.activityId) {
+    const previousActivity = activities.find(activity => activity.id === existingForm.activityId);
+    if (previousActivity && previousActivity.assignedFormId === existingForm.id) previousActivity.assignedFormId = undefined;
+  }
+  if (updatedForm.activityId) activities.find(activity => activity.id === updatedForm.activityId)!.assignedFormId = existingForm.id;
+  evaluationForms[idx] = { ...updatedForm, updatedAt: new Date().toISOString(), version: (existingForm.version || 1) + 1 };
   auditLogs.unshift({
-    id: `log-${Date.now()}`,
+    id: `log-${randomUUID()}`,
     timestamp: new Date().toISOString(),
     adminName: 'Dr. Jane C. Monfort',
     action: 'FORM_UPDATED',
@@ -1629,12 +1742,16 @@ app.put('/api/forms/:id', (req, res) => {
 });
 
 app.delete('/api/forms/:id', (req, res) => {
+  if (req.headers['x-user-role'] !== 'admin') return res.status(403).json({ error: 'Only administrators can delete forms.' });
   const idx = evaluationForms.findIndex(f => f.id === req.params.id);
   if (idx === -1) {
     res.status(404).json({ error: 'Form not found' });
     return;
   }
   const deleted = evaluationForms.splice(idx, 1)[0];
+  activities.forEach(activity => {
+    if (activity.assignedFormId === deleted.id) activity.assignedFormId = undefined;
+  });
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
@@ -1647,6 +1764,7 @@ app.delete('/api/forms/:id', (req, res) => {
 });
 
 app.post('/api/forms/:id/duplicate', (req, res) => {
+  if (req.headers['x-user-role'] !== 'admin') return res.status(403).json({ error: 'Only administrators can duplicate forms.' });
   const orig = evaluationForms.find(f => f.id === req.params.id);
   if (!orig) {
     res.status(404).json({ error: 'Form not found' });

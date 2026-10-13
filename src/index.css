@@ -264,6 +264,24 @@ textarea:focus-visible {
     gap: 6pt;
   }
 
+  .evaluation-print-rubric {
+    width: 100%;
+    border-collapse: collapse;
+    break-inside: avoid;
+    font-size: 8.5pt;
+  }
+
+  .evaluation-print-rubric th,
+  .evaluation-print-rubric td {
+    padding: 5pt;
+    border: 1px solid #9ca3af;
+    text-align: center;
+  }
+
+  .evaluation-print-rubric th:first-child {
+    text-align: left;
+  }
+
   .evaluation-print-box {
     width: 10pt;
     height: 10pt;

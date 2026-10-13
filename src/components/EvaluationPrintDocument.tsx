@@ -40,14 +40,28 @@ const answerText = (answer: unknown): string => Array.isArray(answer) ? answer.j
 
 const PrintQuestion: React.FC<{ question: EvaluationForm['sections'][number]['questions'][number]; index: number; answer?: unknown }> = ({ question, index, answer }) => {
   const savedAnswer = answerText(answer);
+  const rubricAnswer = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer as Record<string, unknown> : undefined;
   return (
     <article className="evaluation-print-question">
       <p className="evaluation-print-question-label"><strong>{index}. {question.label}</strong>{question.required && <span> *</span>}</p>
       {question.description && <p className="evaluation-print-muted">{question.description}</p>}
-      {savedAnswer ? <p className="evaluation-print-answer">Response: {savedAnswer}</p> : (
+      {question.type === 'rubric_table' ? (
+        <table className="evaluation-print-rubric">
+          <thead><tr><th>Criterion</th>{(question.options || []).map(option => <th key={option}>{option}</th>)}</tr></thead>
+          <tbody>{(question.criteria || []).map(criterion => <tr key={criterion}><th>{criterion}</th>{(question.options || []).map((option, optionIndex) => {
+            const score = (question.scaleMin || 1) + optionIndex;
+            const selected = Number(rubricAnswer?.[criterion]) === score;
+            return <td key={option} aria-label={selected ? `Selected ${option}` : option}>{selected ? '[X]' : '[ ]'}</td>;
+          })}</tr>)}</tbody>
+        </table>
+      ) : question.type === 'instructions' ? null : savedAnswer ? <p className="evaluation-print-answer">Response: {savedAnswer}</p> : (
         <div className="evaluation-print-response">
           {question.type === 'rating_scale' || question.type === 'star_rating' ? (
             <div className="evaluation-print-scale"><span>{question.scaleMinLabel || 'Low'}</span><strong>{Array.from({ length: Math.min(10, Math.max(2, (question.scaleMax || 5) - (question.scaleMin || 1) + 1)) }, (_, value) => `(${(question.scaleMin || 1) + value})`).join('   ')}</strong><span>{question.scaleMaxLabel || 'High'}</span></div>
+          ) : question.type === 'likert_scale' ? (
+            <ul className="evaluation-print-options">{(question.scaleLabels || []).map((label, optionIndex) => <li key={label}><span className="evaluation-print-radio evaluation-print-box" />{label} ({(question.scaleMin || 1) + optionIndex})</li>)}</ul>
+          ) : question.type === 'yes_no' ? (
+            <ul className="evaluation-print-options"><li><span className="evaluation-print-radio evaluation-print-box" />Yes</li><li><span className="evaluation-print-radio evaluation-print-box" />No</li></ul>
           ) : question.type === 'dropdown' ? (
             <p className="evaluation-print-dropdown">Select one: ____________________ <span>Options: {(question.options || []).join(' / ')}</span></p>
           ) : ['single_choice', 'multiple_choice'].includes(question.type) ? (

@@ -49,12 +49,14 @@ const parseRequired = (value: string): boolean | undefined => {
 const normalizeType = (value: string): QuestionType | null => {
   const type = value.toLowerCase().replace(/[^a-z]+/g, '_').replace(/^_|_$/g, '');
   const aliases: Record<string, QuestionType> = {
-    rating: 'rating_scale', likert: 'rating_scale', likert_scale: 'rating_scale', rating_scale: 'rating_scale', scale: 'rating_scale',
+    rating: 'rating_scale', rating_scale: 'rating_scale', scale: 'rating_scale',
     radio: 'single_choice', radio_button: 'single_choice', single: 'single_choice', single_choice: 'single_choice',
     checkbox: 'multiple_choice', checkboxes: 'multiple_choice', multiple: 'multiple_choice', multiple_choice: 'multiple_choice',
     dropdown: 'dropdown', select: 'dropdown', short_text: 'short_text', text: 'short_text', input: 'short_text',
     long_text: 'long_text', textarea: 'long_text', paragraph: 'long_text', number: 'number', numeric: 'number',
     date: 'date', email: 'email',
+    yes_no: 'yes_no', binary: 'yes_no', likert: 'likert_scale', likert_scale: 'likert_scale',
+    rubric: 'rubric_table', rubric_table: 'rubric_table', instructions: 'instructions', description: 'instructions',
   };
   return aliases[type] || null;
 };
@@ -168,11 +170,12 @@ export const buildEvaluationDraft = (
       description: valueAt(row, 'description') || undefined,
       type: inferred.type,
       required: required ?? true,
-      options: ['single_choice', 'multiple_choice', 'dropdown'].includes(inferred.type) ? options : undefined,
-      scaleMin: inferred.type === 'rating_scale' ? inferred.min || 1 : undefined,
-      scaleMax: inferred.type === 'rating_scale' ? inferred.max || 5 : undefined,
+      options: ['single_choice', 'multiple_choice', 'dropdown'].includes(inferred.type) ? options : inferred.type === 'yes_no' ? ['Yes', 'No'] : undefined,
+      scaleMin: ['rating_scale', 'likert_scale', 'rubric_table'].includes(inferred.type) ? inferred.min || 1 : undefined,
+      scaleMax: ['rating_scale', 'likert_scale', 'rubric_table'].includes(inferred.type) ? inferred.max || 5 : undefined,
       scaleMinLabel: inferred.minLabel,
       scaleMaxLabel: inferred.maxLabel,
+      scaleLabels: inferred.type === 'likert_scale' ? options : undefined,
     };
     sectionMap.set(section, [...(sectionMap.get(section) || []), questionData]);
   });

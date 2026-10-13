@@ -27,10 +27,13 @@ import {
 } from 'lucide-react';
 
 export const EvaluationFormBuilder: React.FC = () => {
-  const { forms, createForm, updateForm, deleteForm, duplicateForm, theme, systemSettings, role } = useApp();
+  const { forms, activities, createForm, updateForm, deleteForm, duplicateForm, theme, systemSettings, role, isLoading } = useApp();
 
   const [activeFormId, setActiveFormId] = useState<string>(forms[0]?.id || '');
   const [editingForm, setEditingForm] = useState<EvaluationForm | null>(null);
+  const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
+  const [isSavingForm, setIsSavingForm] = useState(false);
+  const [formSaveError, setFormSaveError] = useState('');
   const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [printForm, setPrintForm] = useState<EvaluationForm | null>(null);
@@ -54,10 +57,15 @@ export const EvaluationFormBuilder: React.FC = () => {
 
   // Question form fields
   const [qLabel, setQLabel] = useState('');
+  const [qCriterionName, setQCriterionName] = useState('');
   const [qDescription, setQDescription] = useState('');
   const [qType, setQType] = useState<QuestionType>('rating_scale');
   const [qRequired, setQRequired] = useState(true);
   const [qOptionsText, setQOptionsText] = useState('Option 1\nOption 2\nOption 3');
+  const [qCriteriaText, setQCriteriaText] = useState('Criterion 1\nCriterion 2');
+  const [qScaleLabelsText, setQScaleLabelsText] = useState('Strongly Disagree\nDisagree\nNeutral\nAgree\nStrongly Agree');
+  const [qMinimumSelections, setQMinimumSelections] = useState('');
+  const [qMaximumSelections, setQMaximumSelections] = useState('');
   const [qScaleMin, setQScaleMin] = useState(1);
   const [qScaleMax, setQScaleMax] = useState(5);
   const [qScaleMinLabel, setQScaleMinLabel] = useState('Strongly Disagree');
@@ -70,49 +78,72 @@ export const EvaluationFormBuilder: React.FC = () => {
   // Selected or active form
   const currentForm = editingForm || forms.find(f => f.id === activeFormId) || forms[0];
 
+  useEffect(() => {
+    if (!editingForm && !activeFormId && forms.length > 0) setActiveFormId(forms[0].id);
+  }, [activeFormId, editingForm, forms]);
+
   const handleStartEditForm = (form: EvaluationForm) => {
     setEditingForm(JSON.parse(JSON.stringify(form)));
+    setIsCreatingNewForm(false);
+    setFormSaveError('');
   };
 
-  const handleCreateNewForm = async () => {
-    const newForm: Partial<EvaluationForm> = {
+  const handleCreateNewForm = () => {
+    const now = new Date().toISOString();
+    const newForm: EvaluationForm = {
+      id: `draft-${crypto.randomUUID()}`,
       title: 'New Evaluation Rubric Form',
       description: 'Custom evaluation questionnaire for Southern Leyte State University extension programs.',
       instructions: 'Please answer all questions objectively.',
       status: 'draft',
       version: 1,
       targetActivityType: 'all',
-      sections: [
-        {
-          id: `sec-${Date.now()}`,
-          title: 'I. General Evaluation Dimension',
-          description: 'Assess content delivery and attainment of objectives',
-          questions: [
-            {
-              id: `q-${Date.now()}-1`,
-              label: 'Overall Satisfaction with Extension Service',
-              description: 'How would you rate your experience?',
-              type: 'rating_scale',
-              required: true,
-              scaleMin: 1,
-              scaleMax: 5,
-              scaleMinLabel: 'Very Dissatisfied',
-              scaleMaxLabel: 'Very Satisfied',
-              weight: 25
-            }
-          ]
-        }
-      ]
+      activityId: '',
+      targetRespondent: '',
+      purpose: '',
+      sections: [],
+      createdAt: now,
+      updatedAt: now,
     };
-    const created = await createForm(newForm);
-    setActiveFormId(created.id);
-    setEditingForm(JSON.parse(JSON.stringify(created)));
+    setActiveFormId(newForm.id);
+    setEditingForm(newForm);
+    setIsCreatingNewForm(true);
+    setFormSaveError('');
   };
 
-  const handleSaveForm = async () => {
+  const handleSaveForm = async (publish = false) => {
     if (!editingForm) return;
-    await updateForm(editingForm.id, editingForm);
+    const formToSave = publish ? { ...editingForm, status: 'published' as const } : editingForm;
+    if (!formToSave.title.trim()) {
+      setFormSaveError('Enter a form title before saving.');
+      return;
+    }
+    if (formToSave.status === 'published' && !formToSave.sections.some(section => section.questions.length > 0)) {
+      setFormSaveError('Add at least one question before publishing this form.');
+      return;
+    }
+
+    setIsSavingForm(true);
+    setFormSaveError('');
+    try {
+      const savedForm = isCreatingNewForm
+        ? await createForm({ ...formToSave, id: undefined })
+        : await updateForm(formToSave.id, formToSave);
+      setActiveFormId(savedForm.id);
+      setEditingForm(null);
+      setIsCreatingNewForm(false);
+    } catch (cause) {
+      setFormSaveError(cause instanceof Error ? cause.message : 'The form could not be saved. Your edits are still open.');
+    } finally {
+      setIsSavingForm(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
     setEditingForm(null);
+    setIsCreatingNewForm(false);
+    setFormSaveError('');
+    setActiveFormId(forms[0]?.id || '');
   };
 
   const handleAddSection = () => {
@@ -141,10 +172,15 @@ export const EvaluationFormBuilder: React.FC = () => {
     setTargetSectionId(secId);
     setEditingQuestion(null);
     setQLabel('');
+    setQCriterionName('');
     setQDescription('');
     setQType('rating_scale');
     setQRequired(true);
     setQOptionsText('Option 1\nOption 2\nOption 3');
+    setQCriteriaText('Criterion 1\nCriterion 2');
+    setQScaleLabelsText('Strongly Disagree\nDisagree\nNeutral\nAgree\nStrongly Agree');
+    setQMinimumSelections('');
+    setQMaximumSelections('');
     setQScaleMin(1);
     setQScaleMax(5);
     setQScaleMinLabel('Strongly Disagree');
@@ -157,10 +193,15 @@ export const EvaluationFormBuilder: React.FC = () => {
     setTargetSectionId(secId);
     setEditingQuestion(q);
     setQLabel(q.label);
+    setQCriterionName(q.criterionName || '');
     setQDescription(q.description || '');
     setQType(q.type);
     setQRequired(q.required);
     setQOptionsText((q.options || []).join('\n'));
+    setQCriteriaText((q.criteria || []).join('\n'));
+    setQScaleLabelsText((q.scaleLabels || []).join('\n'));
+    setQMinimumSelections(q.minSelections === undefined ? '' : String(q.minSelections));
+    setQMaximumSelections(q.maxSelections === undefined ? '' : String(q.maxSelections));
     setQScaleMin(q.scaleMin || 1);
     setQScaleMax(q.scaleMax || 5);
     setQScaleMinLabel(q.scaleMinLabel || 'Strongly Disagree');
@@ -173,21 +214,28 @@ export const EvaluationFormBuilder: React.FC = () => {
     e.preventDefault();
     if (!editingForm || !qLabel.trim()) return;
 
-    const options = ['single_choice', 'multiple_choice', 'dropdown'].includes(qType)
+    const options = ['single_choice', 'multiple_choice', 'dropdown', 'rubric_table'].includes(qType)
       ? qOptionsText.split('\n').map(o => o.trim()).filter(Boolean)
-      : undefined;
+      : qType === 'yes_no' ? ['Yes', 'No'] : undefined;
+    const criteria = qType === 'rubric_table' ? qCriteriaText.split('\n').map(item => item.trim()).filter(Boolean) : undefined;
+    const scaleLabels = qType === 'likert_scale' ? qScaleLabelsText.split('\n').map(item => item.trim()).filter(Boolean) : undefined;
 
     const qData: FormQuestion = {
       id: editingQuestion ? editingQuestion.id : `q-${Date.now()}`,
+      criterionName: qCriterionName.trim() || undefined,
       label: qLabel.trim(),
       description: qDescription.trim() || undefined,
       type: qType,
-      required: qRequired,
+      required: qType === 'instructions' ? false : qRequired,
       options,
-      scaleMin: qType === 'rating_scale' || qType === 'star_rating' ? qScaleMin : undefined,
-      scaleMax: qType === 'rating_scale' || qType === 'star_rating' ? qScaleMax : undefined,
-      scaleMinLabel: qType === 'rating_scale' ? qScaleMinLabel : undefined,
-      scaleMaxLabel: qType === 'rating_scale' ? qScaleMaxLabel : undefined,
+      criteria,
+      scaleLabels,
+      minSelections: qType === 'multiple_choice' && qMinimumSelections !== '' ? Number(qMinimumSelections) : undefined,
+      maxSelections: qType === 'multiple_choice' && qMaximumSelections !== '' ? Number(qMaximumSelections) : undefined,
+      scaleMin: ['rating_scale', 'star_rating', 'likert_scale', 'rubric_table'].includes(qType) ? qScaleMin : undefined,
+      scaleMax: ['rating_scale', 'star_rating', 'likert_scale', 'rubric_table'].includes(qType) ? qScaleMax : undefined,
+      scaleMinLabel: ['rating_scale', 'likert_scale'].includes(qType) ? qScaleMinLabel : undefined,
+      scaleMaxLabel: ['rating_scale', 'likert_scale'].includes(qType) ? qScaleMaxLabel : undefined,
       weight: qWeight
     };
 
@@ -237,6 +285,28 @@ export const EvaluationFormBuilder: React.FC = () => {
     setEditingForm({ ...editingForm, sections: updated });
   };
 
+  const handleDuplicateQuestion = (secId: string, question: FormQuestion) => {
+    if (!editingForm) return;
+    const updatedSections = editingForm.sections.map(section => {
+      if (section.id !== secId) return section;
+      const questionIndex = section.questions.findIndex(item => item.id === question.id);
+      const duplicate = { ...question, id: `q-${crypto.randomUUID()}`, label: `${question.label} (Copy)` };
+      const questions = [...section.questions];
+      questions.splice(questionIndex + 1, 0, duplicate);
+      return { ...section, questions };
+    });
+    setEditingForm({ ...editingForm, sections: updatedSections });
+  };
+
+  const handleMoveSection = (index: number, direction: 'up' | 'down') => {
+    if (!editingForm) return;
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= editingForm.sections.length) return;
+    const sections = [...editingForm.sections];
+    [sections[index], sections[target]] = [sections[target], sections[index]];
+    setEditingForm({ ...editingForm, sections });
+  };
+
   return (
     <div className="space-y-6">
       
@@ -262,7 +332,9 @@ export const EvaluationFormBuilder: React.FC = () => {
             <span>Import Excel (.xlsx)</span>
           </button>}
           <button
+            type="button"
             onClick={() => setShowPreviewModal(true)}
+            disabled={!currentForm}
             className="px-3.5 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Eye className="w-4 h-4 text-slate-500" />
@@ -289,6 +361,22 @@ export const EvaluationFormBuilder: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {!currentForm && (
+        <section className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xs">
+          <Layers className="mx-auto h-10 w-10 text-emerald-800" />
+          <h3 className="mt-3 text-base font-bold text-slate-900">{isLoading ? 'Loading evaluation forms' : 'No evaluation forms yet'}</h3>
+          <p className="mx-auto mt-1 max-w-lg text-xs text-slate-600">
+            {isLoading ? 'The form list is loading from the server.' : 'Create your first form or import an Excel questionnaire to start building a respondent-ready evaluation.'}
+          </p>
+          {!isLoading && role === 'admin' && <button
+            type="button"
+            onClick={handleCreateNewForm}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold text-white"
+            style={{ backgroundColor: theme.primaryColor }}
+          ><Plus className="h-4 w-4" /> Create First Form</button>}
+        </section>
+      )}
 
       {/* Forms Tabs Roster */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs border-b border-slate-200">
@@ -343,6 +431,27 @@ export const EvaluationFormBuilder: React.FC = () => {
                     placeholder="Form description..."
                     className="w-full text-xs text-slate-600 border border-slate-300 rounded-lg p-2"
                   />
+                  <textarea
+                    rows={2}
+                    value={editingForm.instructions || ''}
+                    onChange={(e) => setEditingForm({ ...editingForm, instructions: e.target.value })}
+                    placeholder="Instructions for respondents..."
+                    className="w-full text-xs text-slate-600 border border-slate-300 rounded-lg p-2"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <label className="text-[11px] font-semibold text-slate-600">Respondent group
+                      <input value={editingForm.targetRespondent || ''} onChange={event => setEditingForm({ ...editingForm, targetRespondent: event.target.value })} placeholder="e.g. Activity participants" className="mt-1 w-full rounded border border-slate-300 p-2 font-normal" />
+                    </label>
+                    <label className="text-[11px] font-semibold text-slate-600">Evaluation purpose
+                      <input value={editingForm.purpose || ''} onChange={event => setEditingForm({ ...editingForm, purpose: event.target.value })} placeholder="What this form evaluates" className="mt-1 w-full rounded border border-slate-300 p-2 font-normal" />
+                    </label>
+                    <label className="text-[11px] font-semibold text-slate-600">Associated activity
+                      <select value={editingForm.activityId || ''} onChange={event => setEditingForm({ ...editingForm, activityId: event.target.value })} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-normal">
+                        <option value="">Not assigned to one activity</option>
+                        {activities.map(activity => <option key={activity.id} value={activity.id}>{activity.title}</option>)}
+                      </select>
+                    </label>
+                  </div>
                   <div className="flex items-center gap-4 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-slate-700">Status:</span>
@@ -394,19 +503,29 @@ export const EvaluationFormBuilder: React.FC = () => {
               {editingForm ? (
                 <>
                   <button
-                    onClick={() => setEditingForm(null)}
+                    type="button"
+                    onClick={handleCancelEdit}
+                    disabled={isSavingForm}
                     className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={handleSaveForm}
+                    type="button"
+                    onClick={() => void handleSaveForm()}
+                    disabled={isSavingForm}
                     className="px-4 py-2 rounded-lg text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
                     style={{ backgroundColor: theme.primaryColor }}
                   >
                     <Save className="w-4 h-4" />
-                    <span>Save Form Changes</span>
+                    <span>{isSavingForm ? 'Saving...' : isCreatingNewForm ? 'Save Draft' : editingForm.status === 'published' ? 'Save Published Form' : 'Save Form Changes'}</span>
                   </button>
+                  {editingForm.status === 'draft' && <button
+                    type="button"
+                    onClick={() => void handleSaveForm(true)}
+                    disabled={isSavingForm}
+                    className="px-4 py-2 rounded-lg border border-emerald-800 bg-emerald-50 text-emerald-900 font-bold text-xs disabled:opacity-50"
+                  >Publish</button>}
                 </>
               ) : (
                 <>
@@ -440,6 +559,13 @@ export const EvaluationFormBuilder: React.FC = () => {
 
           {/* Form Sections & Questions List */}
           <div className="space-y-6">
+            {editingForm && formSaveError && <p role="alert" className="rounded border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900">{formSaveError}</p>}
+            {(editingForm ? editingForm.sections : currentForm.sections).length === 0 && (
+              <div className="rounded border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                <h4 className="text-sm font-semibold text-slate-800">This form has no sections yet</h4>
+                <p className="mt-1 text-xs text-slate-500">Add a section below, then add questions and evaluation criteria.</p>
+              </div>
+            )}
             {(editingForm ? editingForm.sections : currentForm.sections).map((sec, secIdx) => (
               <div key={sec.id} className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
                 {/* Section Header */}
@@ -453,6 +579,8 @@ export const EvaluationFormBuilder: React.FC = () => {
 
                   {editingForm && (
                     <div className="flex items-center gap-2">
+                      <button type="button" disabled={secIdx === 0} onClick={() => handleMoveSection(secIdx, 'up')} className="p-1.5 rounded text-slate-600 hover:bg-white disabled:opacity-30" title="Move section up"><ArrowUp className="h-3.5 w-3.5" /></button>
+                      <button type="button" disabled={secIdx === editingForm.sections.length - 1} onClick={() => handleMoveSection(secIdx, 'down')} className="p-1.5 rounded text-slate-600 hover:bg-white disabled:opacity-30" title="Move section down"><ArrowDown className="h-3.5 w-3.5" /></button>
                       <button
                         onClick={() => openAddQuestion(sec.id)}
                         className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs border border-slate-200 flex items-center gap-1 cursor-pointer"
@@ -493,6 +621,7 @@ export const EvaluationFormBuilder: React.FC = () => {
                               {q.type.replace('_', ' ')}
                             </span>
                           </div>
+                          {q.criterionName && <p className="text-[11px] font-semibold text-emerald-900">Criterion: {q.criterionName}</p>}
                           {q.description && (
                             <p className="text-[11px] text-slate-500">{q.description}</p>
                           )}
@@ -532,6 +661,7 @@ export const EvaluationFormBuilder: React.FC = () => {
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
+                            <button type="button" onClick={() => handleDuplicateQuestion(sec.id, q)} className="p-1 rounded hover:bg-slate-100 text-slate-700 cursor-pointer" title="Duplicate Question"><Copy className="w-3.5 h-3.5" /></button>
                             <button
                               onClick={() => handleDeleteQuestion(sec.id, q.id)}
                               className="p-1 rounded hover:bg-rose-50 text-rose-600 cursor-pointer"
@@ -587,6 +717,17 @@ export const EvaluationFormBuilder: React.FC = () => {
 
             <form onSubmit={handleSaveQuestion} className="space-y-3 text-xs">
               <div>
+                <label className="block font-semibold text-slate-700 mb-1">Criterion Name (optional):</label>
+                <input
+                  type="text"
+                  value={qCriterionName}
+                  onChange={(e) => setQCriterionName(e.target.value)}
+                  placeholder="e.g. Quality of service delivery"
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900"
+                />
+              </div>
+
+              <div>
                 <label className="block font-semibold text-slate-700 mb-1">Question Prompt / Statement:</label>
                 <input
                   type="text"
@@ -614,7 +755,11 @@ export const EvaluationFormBuilder: React.FC = () => {
                   <label className="block font-semibold text-slate-700 mb-1">Response Type:</label>
                   <select
                     value={qType}
-                    onChange={(e) => setQType(e.target.value as QuestionType)}
+                    onChange={(e) => {
+                      const nextType = e.target.value as QuestionType;
+                      setQType(nextType);
+                      if (nextType === 'instructions') setQRequired(false);
+                    }}
                     className="w-full border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900"
                   >
                     <option value="rating_scale">Rating Scale (1-5 Likert)</option>
@@ -627,6 +772,10 @@ export const EvaluationFormBuilder: React.FC = () => {
                     <option value="number">Number</option>
                     <option value="date">Date</option>
                     <option value="email">Email</option>
+                    <option value="yes_no">Yes / No</option>
+                    <option value="likert_scale">Likert Scale</option>
+                    <option value="rubric_table">Rubric Table</option>
+                    <option value="instructions">Instructions / Description</option>
                   </select>
                 </div>
 
@@ -643,10 +792,10 @@ export const EvaluationFormBuilder: React.FC = () => {
                 </div>
               </div>
 
-              {['single_choice', 'multiple_choice', 'dropdown'].includes(qType) && (
+              {['single_choice', 'multiple_choice', 'dropdown', 'rubric_table'].includes(qType) && (
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Choice Options (one per line):
+                    {qType === 'rubric_table' ? 'Rating levels (one per line):' : 'Choice Options (one per line):'}
                   </label>
                   <textarea
                     rows={3}
@@ -657,7 +806,22 @@ export const EvaluationFormBuilder: React.FC = () => {
                 </div>
               )}
 
-              {qType === 'rating_scale' && (
+              {qType === 'rubric_table' && <div>
+                <label className="block font-semibold text-slate-700 mb-1">Rubric criteria (one row per line):</label>
+                <textarea rows={3} value={qCriteriaText} onChange={event => setQCriteriaText(event.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-xs" />
+              </div>}
+
+              {qType === 'likert_scale' && <div>
+                <label className="block font-semibold text-slate-700 mb-1">Likert labels (one per line, lowest to highest):</label>
+                <textarea rows={3} value={qScaleLabelsText} onChange={event => setQScaleLabelsText(event.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-xs" />
+              </div>}
+
+              {qType === 'multiple_choice' && <div className="grid grid-cols-2 gap-3">
+                <label className="text-[11px] font-semibold text-slate-600">Minimum selections<input type="number" min="0" value={qMinimumSelections} onChange={event => setQMinimumSelections(event.target.value)} className="mt-1 w-full rounded border border-slate-300 p-2" /></label>
+                <label className="text-[11px] font-semibold text-slate-600">Maximum selections<input type="number" min="1" value={qMaximumSelections} onChange={event => setQMaximumSelections(event.target.value)} className="mt-1 w-full rounded border border-slate-300 p-2" /></label>
+              </div>}
+
+              {['rating_scale', 'star_rating', 'likert_scale', 'rubric_table'].includes(qType) && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">Low Label (1):</label>
@@ -680,11 +844,12 @@ export const EvaluationFormBuilder: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex items-center gap-2 pt-2">
+                  <div className="flex items-center gap-2 pt-2">
                 <input
                   type="checkbox"
                   id="reqCheck"
-                  checked={qRequired}
+                  checked={qType === 'instructions' ? false : qRequired}
+                  disabled={qType === 'instructions'}
                   onChange={(e) => setQRequired(e.target.checked)}
                   className="rounded text-emerald-800"
                 />
@@ -751,14 +916,15 @@ export const EvaluationFormBuilder: React.FC = () => {
                         {q.description && (
                           <p className="text-[11px] text-slate-500">{q.description}</p>
                         )}
+                        {q.criterionName && <p className="text-[11px] font-semibold text-emerald-900">Criterion: {q.criterionName}</p>}
 
-                        {(q.type === 'rating_scale' || q.type === 'star_rating') && (
+                        {(q.type === 'rating_scale' || q.type === 'star_rating' || q.type === 'likert_scale') && (
                           <div className="flex items-center justify-between gap-2 pt-1">
                             <span className="text-[10px] text-slate-400">{q.scaleMinLabel || 'Low'}</span>
                             <div className="flex gap-2">
                               {Array.from({ length: Math.min(10, Math.max(2, (q.scaleMax || 5) - (q.scaleMin || 1) + 1)) }, (_, index) => (q.scaleMin || 1) + index).map(v => (
                                 <button key={v} type="button" className="w-8 h-8 rounded-full border border-slate-300 font-bold hover:bg-emerald-50">
-                                  {v}
+                                  {q.type === 'likert_scale' ? q.scaleLabels?.[v - (q.scaleMin || 1)] || v : v}
                                 </button>
                               ))}
                             </div>
@@ -766,9 +932,9 @@ export const EvaluationFormBuilder: React.FC = () => {
                           </div>
                         )}
 
-                        {q.type === 'single_choice' && q.options && (
+                        {(q.type === 'single_choice' || q.type === 'yes_no') && (
                           <div className="space-y-1.5 pt-1">
-                            {q.options.map((opt, oIdx) => (
+                            {(q.type === 'yes_no' ? ['Yes', 'No'] : q.options || []).map((opt, oIdx) => (
                               <label key={oIdx} className="flex items-center gap-2 cursor-pointer">
                                 <input type="radio" name={q.id} className="text-emerald-800" />
                                 <span>{opt}</span>
@@ -788,7 +954,19 @@ export const EvaluationFormBuilder: React.FC = () => {
                           </div>
                         )}
 
+                        {q.type === 'rubric_table' && <div className="overflow-x-auto"><table className="min-w-full border-collapse text-[11px]"><thead><tr><th className="border p-2 text-left">Criterion</th>{q.options?.map(option => <th key={option} className="border p-2">{option}</th>)}</tr></thead><tbody>{q.criteria?.map(criterion => <tr key={criterion}><th className="border p-2 text-left">{criterion}</th>{q.options?.map(option => <td key={option} className="border p-2 text-center"><input type="radio" name={`${q.id}-${criterion}`} disabled aria-label={`${criterion}: ${option}`} /></td>)}</tr>)}</tbody></table></div>}
+
+                        {q.type === 'yes_no' && <div className="flex gap-4"><label className="flex items-center gap-2"><input type="radio" name={q.id} disabled />Yes</label><label className="flex items-center gap-2"><input type="radio" name={q.id} disabled />No</label></div>}
+
+                        {q.type === 'likert_scale' && <div className="flex flex-wrap gap-3">{(q.scaleLabels || []).map((label, scaleIndex) => <label key={label} className="flex items-center gap-1.5"><input type="radio" name={q.id} disabled />{label}</label>)}</div>}
+
+                        {q.type === 'instructions' && <p className="rounded bg-emerald-50 p-3 text-xs text-slate-700">{q.description || q.label}</p>}
+
                         {q.type === 'dropdown' && q.options && <select aria-label={q.label} className="w-full border border-slate-300 rounded p-2 text-xs"><option>Select an answer</option>{q.options.map((option, optionIndex) => <option key={optionIndex}>{option}</option>)}</select>}
+
+                        {q.type === 'rubric_table' && <div className="overflow-x-auto"><table className="min-w-full border-collapse text-[11px]"><thead><tr><th className="border p-2 text-left">Criterion</th>{q.options?.map(option => <th key={option} className="border p-2">{option}</th>)}</tr></thead><tbody>{q.criteria?.map(criterion => <tr key={criterion}><th className="border p-2 text-left">{criterion}</th>{q.options?.map(option => <td key={option} className="border p-2 text-center"><input type="radio" name={`${q.id}-${criterion}`} disabled aria-label={`${criterion}: ${option}`} /></td>)}</tr>)}</tbody></table></div>}
+
+                        {q.type === 'instructions' && <p className="rounded bg-emerald-50 p-3 text-xs text-slate-700">{q.description || q.label}</p>}
 
                         {q.type === 'short_text' && (
                           <input type="text" placeholder="Type answer here..." className="w-full border border-slate-300 rounded p-2 text-xs" />
