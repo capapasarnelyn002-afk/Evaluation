@@ -29,6 +29,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { TOPIC_LABELS, PARTICIPANT_CATEGORIES_DISPLAY } from '../data/seedData';
+import { apiFetch } from '../utils/api';
 
 type AdminTab = 'overview' | 'sentiment_topics' | 'ai_reports' | 'submissions' | 'activities' | 'audit_privacy';
 type SortField = 'date' | 'rating' | 'control';
@@ -159,7 +160,7 @@ export const AdminDashboard: React.FC = () => {
   const handleGenerateReport = async () => {
     setIsGeneratingReport(true);
     try {
-      const res = await fetch('/api/ai/executive-report', {
+      const res = await apiFetch('/api/ai/executive-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -198,7 +199,7 @@ export const AdminDashboard: React.FC = () => {
     setQuickAnswer(null);
 
     try {
-      const res = await fetch('/api/ai/quick-insights', {
+      const res = await apiFetch('/api/ai/quick-insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: quickQuestion })

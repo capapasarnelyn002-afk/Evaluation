@@ -33,6 +33,7 @@ import {
   Palette
 } from 'lucide-react';
 import { TOPIC_LABELS, PARTICIPANT_CATEGORIES_DISPLAY } from '../../data/seedData';
+import { apiFetch } from '../../utils/api';
 import { AdminMonitoringOverview } from '../admin/AdminMonitoringOverview';
 import { EvaluationActivityManager } from '../admin/EvaluationActivityManager';
 import { EvaluationFormBuilder } from '../admin/EvaluationFormBuilder';
@@ -113,7 +114,7 @@ export const AdminDashboardView: React.FC = () => {
   const [newActVenue, setNewActVenue] = useState('SLSU-Hinunangan Campus');
   const [newActBeneficiaries, setNewActBeneficiaries] = useState('Local Farmers & Fisherfolk');
   const [newActDept, setNewActDept] = useState('Faculty of Computer Studies and Information Technology (FCSIT)');
-  const [newActCoordinator, setNewActCoordinator] = useState('Dr. Jane C. Monfort');
+  const [newActCoordinator, setNewActCoordinator] = useState('');
   const [newActSpeaker, setNewActSpeaker] = useState('Faculty Extension Team');
   const [newActTargetCount, setNewActTargetCount] = useState(40);
 
@@ -238,7 +239,7 @@ export const AdminDashboardView: React.FC = () => {
   const handleGenerateReport = async () => {
     setIsGeneratingReport(true);
     try {
-      const res = await fetch('/api/ai/executive-report', {
+      const res = await apiFetch('/api/ai/executive-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -276,7 +277,7 @@ export const AdminDashboardView: React.FC = () => {
     setQuickAnswer(null);
 
     try {
-      const res = await fetch('/api/ai/quick-insights', {
+      const res = await apiFetch('/api/ai/quick-insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: quickQuestion })

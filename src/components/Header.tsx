@@ -7,18 +7,16 @@ import {
   RefreshCw, 
   ShieldCheck, 
   User, 
-  BarChart3, 
   Award,
   Menu,
   X,
-  ChevronDown,
-  Layers
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { 
     role, 
-    switchDemoAccount, 
+    currentUser,
+    logout,
     isOfflineMode, 
     setIsOfflineMode, 
     offlineQueue, 
@@ -77,7 +75,7 @@ export const Header: React.FC = () => {
             <div className="flex flex-col">
               <a
                 href="#"
-                onClick={(e) => { e.preventDefault(); switchDemoAccount('participant'); }}
+                onClick={(e) => e.preventDefault()}
                 className="text-base font-bold tracking-tight text-slate-900 whitespace-nowrap hover:text-emerald-900 transition-colors"
               >
                 SLSU Extension Evaluation
@@ -89,30 +87,13 @@ export const Header: React.FC = () => {
           </div>
 
           {/* Zone 2: Primary Nav Links (Single-Line, Text with Active States) */}
-          <nav className="hidden md:flex items-center gap-1 text-xs font-semibold text-slate-600">
-            <button
-              onClick={() => switchDemoAccount('participant')}
-              className={`px-3.5 py-2 rounded-lg transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                role === 'participant'
-                  ? 'bg-slate-100 text-slate-900 font-bold'
-                  : 'hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <User className="w-3.5 h-3.5 text-slate-500" />
-              <span>Participant Portal</span>
-            </button>
-
-
-            <button
-              onClick={() => switchDemoAccount('admin')}
-              className={`px-3.5 py-2 rounded-lg transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                role === 'admin'
-                  ? 'bg-slate-100 text-slate-900 font-bold'
-                  : 'hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
-              <span>Admin & Audit</span>
+          <nav className="hidden md:flex items-center gap-3 text-xs font-semibold text-slate-600">
+            <span className="flex items-center gap-1.5">
+              {role === 'admin' ? <ShieldCheck className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
+              <span>{currentUser.name}</span>
+            </span>
+            <button onClick={() => void logout()} className="text-emerald-900 hover:underline">
+              Sign out
             </button>
           </nav>
 
@@ -171,32 +152,12 @@ export const Header: React.FC = () => {
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-2 text-xs">
-          <p className="text-[11px] uppercase tracking-wider font-bold text-slate-400 px-2 pt-1">
-            Navigation Roles
-          </p>
+          <p className="px-2 pt-1 font-semibold text-slate-700">{currentUser.name}</p>
           <button
-            onClick={() => { switchDemoAccount('participant'); setMobileMenuOpen(false); }}
-            className={`w-full text-left px-3 py-2.5 rounded-lg font-medium flex items-center justify-between ${
-              role === 'participant' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
-            }`}
+            onClick={() => { void logout(); setMobileMenuOpen(false); }}
+            className="w-full text-left px-3 py-2 text-emerald-900 hover:bg-slate-50"
           >
-            <span className="flex items-center gap-2">
-              <User className="w-4 h-4 text-slate-500" />
-              <span>Participant Portal</span>
-            </span>
-          </button>
-
-
-          <button
-            onClick={() => { switchDemoAccount('admin'); setMobileMenuOpen(false); }}
-            className={`w-full text-left px-3 py-2.5 rounded-lg font-medium flex items-center justify-between ${
-              role === 'admin' ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-slate-500" />
-              <span>Admin & Audit</span>
-            </span>
+            Sign out
           </button>
 
           <div className="pt-2 border-t border-slate-100">

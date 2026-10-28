@@ -14,8 +14,8 @@ import {
   TypographySettings,
   SystemMetrics
 } from '../types';
-import { INITIAL_ACTIVITIES } from '../data/seedData';
 import { ToastMessage } from '../components/ui/Toast';
+import { apiFetch } from '../utils/api';
 
 export interface SystemSettings {
   institutionName: string;
@@ -28,29 +28,6 @@ export interface SystemSettings {
   accreditationCycle: string;
   academicYear: string;
 }
-
-export const DEMO_ACCOUNTS: Record<UserRole, UserAccount> = {
-  admin: {
-    id: 'user-001',
-    name: 'Dr. Jane C. Monfort',
-    email: 'admin@slsu.edu.ph',
-    role: 'admin',
-    department: 'Office of the Campus Director & Quality Assurance',
-    title: 'Director of Extension Services',
-    status: 'active',
-    lastLogin: '2026-05-10T08:30:00Z'
-  },
-  participant: {
-    id: 'user-005',
-    name: 'Vicente B. Alipoyo',
-    email: 'vicente.alipoyo@gmail.com',
-    role: 'participant',
-    department: 'Hinunangan Rural Farmers Association',
-    title: 'Agri-Cooperative Participant',
-    status: 'active',
-    lastLogin: '2026-05-12T11:45:00Z'
-  }
-};
 
 export const DEFAULT_TYPOGRAPHY: TypographySettings = {
   baseFontSize: 1.0,        // 16px
@@ -88,29 +65,7 @@ export const DEFAULT_THEME: WebsiteTheme = {
   sidebarLogoUrl: '',
   sidebarLogoIcon: 'building',
   sidebarLogoShape: 'rounded',
-  sidebarLogoHistory: [
-    {
-      id: 'logo-hist-001',
-      sourceType: 'preset',
-      value: 'building',
-      name: 'SLSU Institutional Campus Landmark',
-      timestamp: '2026-05-10T08:00:00Z'
-    },
-    {
-      id: 'logo-hist-002',
-      sourceType: 'preset',
-      value: 'shield',
-      name: 'AACCUP Quality Assurance Shield',
-      timestamp: '2026-05-08T14:30:00Z'
-    },
-    {
-      id: 'logo-hist-003',
-      sourceType: 'preset',
-      value: 'graduation',
-      name: 'Academic Graduation Faculty Emblem',
-      timestamp: '2026-05-05T09:15:00Z'
-    }
-  ],
+  sidebarLogoHistory: [],
   sidebarActiveItemBg: '#022c22',
   sidebarActiveItemText: '#ffffff',
   sidebarBorderColor: '#e2e8f0',
@@ -135,10 +90,11 @@ interface AppContextType {
   // Authentication & Role
   currentUser: UserAccount;
   role: UserRole;
+  isAuthenticated: boolean;
+  isAuthLoading: boolean;
   users: UserAccount[];
-  switchDemoAccount: (targetRole: UserRole) => void;
-  loginWithEmail: (email: string) => Promise<boolean>;
-  logout: () => void;
+  loginWithEmail: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   updateUserRole: (userId: string, newRole: UserRole, status?: 'active' | 'inactive') => Promise<void>;
   createUserAccount: (accountData: Partial<UserAccount>) => Promise<UserAccount | null>;
   deleteUserAccount: (userId: string) => Promise<boolean>;
@@ -213,8 +169,6 @@ interface AppContextType {
   setShowAboutModal: (show: boolean) => void;
   showSyncModal: boolean;
   setShowSyncModal: (show: boolean) => void;
-  showLoginModal: boolean;
-  setShowLoginModal: (show: boolean) => void;
   lastSubmittedEvaluation: EvaluationSubmission | null;
   setLastSubmittedEvaluation: (evalItem: EvaluationSubmission | null) => void;
   exportDataAsCSV: (includePII?: boolean) => void;
@@ -223,19 +177,18 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_QUEUE_KEY = 'slsu_ext_offline_queue_v1';
-const LOCAL_STORAGE_EVALS_KEY = 'slsu_ext_evals_cache_v1';
-const LOCAL_STORAGE_USER_KEY = 'slsu_ext_current_user_v1';
-const LOCAL_STORAGE_THEME_KEY = 'slsu_ext_theme_v1';
+const LOCAL_STORAGE_ACCESS_TOKEN_KEY = 'slsu_ext_access_token_v1';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Authentication & Demo Accounts
-  const [currentUser, setCurrentUser] = useState<UserAccount>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
-    }
-    return DEMO_ACCOUNTS.admin; // Default to Admin on initial landing
+  const [currentUser, setCurrentUser] = useState<UserAccount>({
+    id: '',
+    name: '',
+    email: '',
+    role: 'participant',
+    status: 'inactive'
   });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const role = currentUser.role;
 
@@ -245,10 +198,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   // Users roster for Admin role management
-  const [users, setUsers] = useState<UserAccount[]>([
-    DEMO_ACCOUNTS.admin,
-    DEMO_ACCOUNTS.participant
-  ]);
+  const [users, setUsers] = useState<UserAccount[]>([]);
 
   // System Settings
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
@@ -264,17 +214,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   // Website Theme Customization
-  const [theme, setTheme] = useState<WebsiteTheme>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_THEME_KEY);
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
-    }
-    return DEFAULT_THEME;
-  });
+  const [theme, setTheme] = useState<WebsiteTheme>(DEFAULT_THEME);
 
   // Data collections
-  const [activities, setActivities] = useState<Activity[]>(INITIAL_ACTIVITIES);
-  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(INITIAL_ACTIVITIES[0].id);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [forms, setForms] = useState<EvaluationForm[]>([]);
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationSubmission[]>([]);
@@ -289,7 +233,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Modal triggers
   const [showAboutModal, setShowAboutModal] = useState<boolean>(false);
   const [showSyncModal, setShowSyncModal] = useState<boolean>(false);
-  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [lastSubmittedEvaluation, setLastSubmittedEvaluation] = useState<EvaluationSubmission | null>(null);
 
   // Apply theme and typography design tokens to CSS variables on DOM
@@ -347,7 +290,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     applyThemeToDOM(theme);
-    localStorage.setItem(LOCAL_STORAGE_THEME_KEY, JSON.stringify(theme));
   }, [theme]);
 
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {
@@ -365,31 +307,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // Switch demo account
-  const switchDemoAccount = (targetRole: UserRole) => {
-    const target = DEMO_ACCOUNTS[targetRole] || DEMO_ACCOUNTS.admin;
-    setCurrentUser(target);
-    localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(target));
-    setCurrentView('overview');
-    addToast({
-      type: 'info',
-      title: `Switched to Demo Role: ${targetRole.toUpperCase()}`,
-      description: `Signed in as ${target.name} (${target.title})`
-    });
-  };
-
-  // Login with email
-  const loginWithEmail = async (email: string): Promise<boolean> => {
+  const loginWithEmail = async (email: string, password: string): Promise<boolean> => {
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, password })
       });
       if (res.ok) {
         const data = await res.json();
         setCurrentUser(data.user);
-        localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(data.user));
+        localStorage.setItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY, data.token);
+        setIsAuthenticated(true);
         setCurrentView('overview');
         addToast({
           type: 'success',
@@ -407,38 +336,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
       }
     } catch {
-      const found = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      if (found) {
-        setCurrentUser(found);
-        localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(found));
-        setCurrentView('overview');
-        addToast({
-          type: 'success',
-          title: 'Sign In Successful',
-          description: `Welcome, ${found.name}`
-        });
-        return true;
-      }
+      addToast({ type: 'error', title: 'Sign In Failed', description: 'The authentication service is unavailable.' });
       return false;
     }
   };
 
-  // Logout
-  const logout = () => {
-    setCurrentUser(DEMO_ACCOUNTS.participant);
-    localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+  const logout = async () => {
+    const token = localStorage.getItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
+    if (token) {
+      try {
+        await apiFetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch {
+        addToast({ type: 'error', title: 'Sign Out Failed', description: 'Could not contact the authentication service.' });
+      }
+    }
+    localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
+    setCurrentUser({ id: '', name: '', email: '', role: 'participant', status: 'inactive' });
+    setIsAuthenticated(false);
+    setUsers([]);
+    setActivities([]);
+    setEvaluations([]);
+    setForms([]);
+    setSurveys([]);
+    setAuditLogs([]);
+    setSystemMetrics(null);
     setCurrentView('overview');
-    addToast({
-      type: 'info',
-      title: 'Signed Out',
-      description: 'Switched to participant portal'
-    });
+    addToast({ type: 'info', title: 'Signed Out', description: 'Your session has ended.' });
   };
 
   // User management
   const updateUserRole = async (userId: string, newRole: UserRole, status: 'active' | 'inactive' = 'active') => {
     try {
-      const res = await fetch(`/api/users/${userId}`, {
+      const res = await apiFetch(`/api/users/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole, status })
@@ -459,7 +391,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const createUserAccount = async (accountData: Partial<UserAccount>): Promise<UserAccount | null> => {
     try {
-      const res = await fetch('/api/users', {
+      const res = await apiFetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(accountData)
@@ -480,7 +412,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteUserAccount = async (userId: string): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/users/${userId}`, { method: 'DELETE' });
       if (res.ok) {
         setUsers(prev => prev.filter(u => u.id !== userId));
         addToast({ type: 'info', title: 'User Removed', description: 'Account deleted.' });
@@ -493,7 +425,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetUserPassword = async (userId: string): Promise<boolean> => {
     try {
-      const res = await fetch(`/api/users/${userId}/reset`, { method: 'POST' });
+      const res = await apiFetch(`/api/users/${userId}/reset`, { method: 'POST' });
       if (res.ok) {
         addToast({ type: 'success', title: 'Reset Link Dispatched', description: 'Temporary credential reset token issued.' });
         return true;
@@ -504,7 +436,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Activity management
   const createActivity = async (activityData: Partial<Activity>): Promise<Activity> => {
-    const res = await fetch('/api/activities', {
+    const res = await apiFetch('/api/activities', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(activityData)
@@ -515,9 +447,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const importEvaluation = async (payload: { requestId: string; title: string; formTitle: string; description: string; instructions: string; activityType: Activity['activityType']; sections: FormSection[] }): Promise<void> => {
-    const res = await fetch('/api/imports/evaluation', {
+    const res = await apiFetch('/api/imports/evaluation', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.role },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const result = await res.json();
@@ -528,7 +460,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateActivity = async (id: string, activityData: Partial<Activity>): Promise<Activity> => {
-    const res = await fetch(`/api/activities/${id}`, {
+    const res = await apiFetch(`/api/activities/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(activityData)
@@ -540,7 +472,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteActivity = async (id: string): Promise<boolean> => {
-    const res = await fetch(`/api/activities/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/activities/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setActivities(prev => prev.filter(a => a.id !== id));
       addToast({ type: 'info', title: 'Activity Archived', description: 'Activity moved to archives.' });
@@ -550,7 +482,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const duplicateActivity = async (id: string): Promise<Activity> => {
-    const res = await fetch(`/api/activities/${id}/duplicate`, { method: 'POST' });
+    const res = await apiFetch(`/api/activities/${id}/duplicate`, { method: 'POST' });
     const cloned = await res.json();
     setActivities(prev => [cloned, ...prev]);
     addToast({ type: 'success', title: 'Activity Duplicated', description: `Created cohort clone "${cloned.title}".` });
@@ -559,9 +491,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Evaluation Form Builder
   const importForm = async (payload: { requestId: string; title: string; description: string; instructions: string; sections: FormSection[]; originalFileName?: string }): Promise<EvaluationForm> => {
-    const res = await fetch('/api/imports/form', {
+    const res = await apiFetch('/api/imports/form', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.role },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const result = await res.json();
@@ -572,9 +504,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const createForm = async (formData: Partial<EvaluationForm>): Promise<EvaluationForm> => {
-    const res = await fetch('/api/forms', {
+    const res = await apiFetch('/api/forms', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.role },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData)
     });
     const created = await res.json().catch(() => ({}));
@@ -587,9 +519,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateForm = async (id: string, formData: Partial<EvaluationForm>): Promise<EvaluationForm> => {
     const previousForm = forms.find(form => form.id === id);
-    const res = await fetch(`/api/forms/${id}`, {
+    const res = await apiFetch(`/api/forms/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUser.role },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData)
     });
     const updated = await res.json().catch(() => ({}));
@@ -604,7 +536,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteForm = async (id: string): Promise<boolean> => {
-    const res = await fetch(`/api/forms/${id}`, { method: 'DELETE', headers: { 'X-User-Role': currentUser.role } });
+    const res = await apiFetch(`/api/forms/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setForms(prev => prev.filter(f => f.id !== id));
       addToast({ type: 'info', title: 'Form Deleted', description: 'Evaluation form removed.' });
@@ -614,7 +546,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const duplicateForm = async (id: string): Promise<EvaluationForm> => {
-    const res = await fetch(`/api/forms/${id}/duplicate`, { method: 'POST', headers: { 'X-User-Role': currentUser.role } });
+    const res = await apiFetch(`/api/forms/${id}/duplicate`, { method: 'POST' });
     const cloned = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(cloned.error || 'The evaluation form could not be duplicated.');
     setForms(prev => [cloned, ...prev]);
@@ -624,7 +556,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Survey Management
   const createSurvey = async (surveyData: Partial<Survey>): Promise<Survey> => {
-    const res = await fetch('/api/surveys', {
+    const res = await apiFetch('/api/surveys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(surveyData)
@@ -636,7 +568,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSurvey = async (id: string, surveyData: Partial<Survey>): Promise<Survey> => {
-    const res = await fetch(`/api/surveys/${id}`, {
+    const res = await apiFetch(`/api/surveys/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(surveyData)
@@ -648,7 +580,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteSurvey = async (id: string): Promise<boolean> => {
-    const res = await fetch(`/api/surveys/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/surveys/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setSurveys(prev => prev.filter(s => s.id !== id));
       addToast({ type: 'info', title: 'Survey Archived', description: 'Survey removed from active list.' });
@@ -658,7 +590,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const submitSurveyResponse = async (surveyId: string, answers: Record<string, any>, name?: string, email?: string): Promise<boolean> => {
-    const res = await fetch(`/api/surveys/${surveyId}/responses`, {
+    const res = await apiFetch(`/api/surveys/${surveyId}/responses`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answers, respondentName: name, respondentEmail: email })
@@ -677,12 +609,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const merged = { ...theme, ...newTheme };
       setTheme(merged);
       applyThemeToDOM(merged);
-      const res = await fetch('/api/theme', {
+      const res = await apiFetch('/api/theme', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-user-role': role
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(merged)
       });
       if (res.ok && showToast) {
@@ -703,9 +632,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       setTheme(DEFAULT_THEME);
       applyThemeToDOM(DEFAULT_THEME);
-      await fetch('/api/theme/reset', { 
-        method: 'POST',
-        headers: { 'x-user-role': role }
+      await apiFetch('/api/theme/reset', {
+        method: 'POST'
       });
       addToast({
         type: 'info',
@@ -718,7 +646,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // System Settings
   const updateSystemSettings = async (newSettings: Partial<SystemSettings>) => {
     try {
-      const res = await fetch('/api/settings', {
+      const res = await apiFetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings)
@@ -739,8 +667,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Refresh metrics
   const refreshMetrics = async () => {
+    if (role !== 'admin') return;
     try {
-      const res = await fetch('/api/admin/metrics');
+      const res = await apiFetch('/api/admin/metrics');
       if (res.ok) {
         const data = await res.json();
         setSystemMetrics(data);
@@ -752,17 +681,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshAllData = async () => {
     setIsLoading(true);
     try {
-      const [actRes, evalRes, formsRes, surveysRes, themeRes, metricsRes, usersRes, logsRes, settingsRes] = await Promise.allSettled([
-        fetch('/api/activities'),
-        fetch('/api/evaluations'),
-        fetch('/api/forms'),
-        fetch('/api/surveys'),
-        fetch('/api/theme'),
-        fetch('/api/admin/metrics'),
-        fetch('/api/users'),
-        fetch('/api/audit-logs'),
-        fetch('/api/settings')
+      const [commonResults, adminResults] = await Promise.all([
+        Promise.allSettled([
+          apiFetch('/api/activities'),
+          apiFetch('/api/evaluations'),
+          apiFetch('/api/forms'),
+          apiFetch('/api/surveys'),
+          apiFetch('/api/theme'),
+          apiFetch('/api/settings')
+        ]),
+        role === 'admin'
+          ? Promise.allSettled([
+              apiFetch('/api/admin/metrics'),
+              apiFetch('/api/users'),
+              apiFetch('/api/audit-logs')
+            ])
+          : Promise.resolve([])
       ]);
+      const [actRes, evalRes, formsRes, surveysRes, themeRes, settingsRes] = commonResults;
+      const [metricsRes, usersRes, logsRes] = adminResults;
 
       if (actRes.status === 'fulfilled' && actRes.value.ok) {
         setActivities(await actRes.value.json());
@@ -770,7 +707,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (evalRes.status === 'fulfilled' && evalRes.value.ok) {
         const evalData = await evalRes.value.json();
         setEvaluations(evalData);
-        localStorage.setItem(LOCAL_STORAGE_EVALS_KEY, JSON.stringify(evalData));
       }
       if (formsRes.status === 'fulfilled' && formsRes.value.ok) {
         setForms(await formsRes.value.json());
@@ -783,36 +719,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTheme(tData);
         applyThemeToDOM(tData);
       }
-      if (metricsRes.status === 'fulfilled' && metricsRes.value.ok) {
+      if (metricsRes?.status === 'fulfilled' && metricsRes.value.ok) {
         setSystemMetrics(await metricsRes.value.json());
       }
-      if (usersRes.status === 'fulfilled' && usersRes.value.ok) {
+      if (usersRes?.status === 'fulfilled' && usersRes.value.ok) {
         setUsers(await usersRes.value.json());
       }
-      if (logsRes.status === 'fulfilled' && logsRes.value.ok) {
+      if (logsRes?.status === 'fulfilled' && logsRes.value.ok) {
         setAuditLogs(await logsRes.value.json());
       }
       if (settingsRes.status === 'fulfilled' && settingsRes.value.ok) {
         setSystemSettings(await settingsRes.value.json());
       }
     } catch (err) {
-      console.warn('Network request failed, using cache:', err);
-      const cachedEvals = localStorage.getItem(LOCAL_STORAGE_EVALS_KEY);
-      if (cachedEvals) {
-        try { setEvaluations(JSON.parse(cachedEvals)); } catch {}
-      }
+      console.error('Failed to load application data from the database:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    localStorage.removeItem('slsu_ext_current_user_v1');
+    localStorage.removeItem('slsu_ext_evals_cache_v1');
+    localStorage.removeItem('slsu_ext_theme_v1');
     const savedQueue = localStorage.getItem(LOCAL_STORAGE_QUEUE_KEY);
     if (savedQueue) {
       try { setOfflineQueue(JSON.parse(savedQueue)); } catch {}
     }
-    refreshAllData();
+    const token = localStorage.getItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
+    if (token) {
+      apiFetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+        .then(async res => {
+          if (!res.ok) throw new Error('Stored sign-in session is no longer valid.');
+          const data = await res.json();
+          setCurrentUser(data.user);
+          setIsAuthenticated(true);
+        })
+        .catch((error: unknown) => {
+          localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
+          if (error instanceof Error) {
+            addToast({ type: 'info', title: 'Sign In Required', description: error.message });
+          }
+        })
+        .finally(() => setIsAuthLoading(false));
+    } else {
+      setIsAuthLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) void refreshAllData();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_QUEUE_KEY, JSON.stringify(offlineQueue));
@@ -820,10 +777,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Submit evaluation
   const submitEvaluation = async (evaluationData: Partial<EvaluationSubmission>): Promise<{ success: boolean; evaluation?: EvaluationSubmission; error?: string }> => {
+    if (!evaluationData.activityId || !activities.some(activity => activity.id === evaluationData.activityId)) {
+      return { success: false, error: 'Select an available activity before submitting an evaluation.' };
+    }
+
     if (isOfflineMode) {
       const offlineRecord: EvaluationSubmission = {
         id: `offline-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        activityId: evaluationData.activityId || activities[0].id,
+        activityId: evaluationData.activityId,
         formId: evaluationData.formId,
         customAnswers: evaluationData.customAnswers,
         participantName: evaluationData.participantName || 'Anonymous Participant',
@@ -868,7 +829,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      const res = await fetch('/api/evaluations', {
+      const res = await apiFetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(evaluationData)
@@ -900,10 +861,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      const res = await fetch('/api/sync', {
+      const res = await apiFetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ evaluations: offlineQueue })
+        body: JSON.stringify({ batch: offlineQueue })
       });
 
       if (res.ok) {
@@ -926,7 +887,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logAuditAction = async (action: string, resourceId: string, reason: string, controlNumber?: string) => {
     try {
-      const res = await fetch('/api/audit-logs', {
+      const res = await apiFetch('/api/audit-logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -957,7 +918,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateFollowUpStatus = async (evalId: string, status: 'none' | 'pending' | 'in_progress' | 'resolved', notes: string) => {
     try {
-      const res = await fetch(`/api/evaluations/${evalId}/follow-up`, {
+      const res = await apiFetch(`/api/evaluations/${evalId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, notes })
@@ -1038,8 +999,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         currentUser,
         role,
+        isAuthenticated,
+        isAuthLoading,
         users,
-        switchDemoAccount,
         loginWithEmail,
         logout,
         updateUserRole,
@@ -1107,8 +1069,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setShowAboutModal,
         showSyncModal,
         setShowSyncModal,
-        showLoginModal,
-        setShowLoginModal,
         lastSubmittedEvaluation,
         setLastSubmittedEvaluation,
         exportDataAsCSV

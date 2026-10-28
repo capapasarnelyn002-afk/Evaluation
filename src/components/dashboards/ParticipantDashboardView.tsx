@@ -43,13 +43,10 @@ export const ParticipantDashboardView: React.FC = () => {
   const [respondentEmail, setRespondentEmail] = useState(currentUser.email);
   const [isSubmittingSurvey, setIsSubmittingSurvey] = useState(false);
 
-  // Participant's completed evaluations (match by email or participantName, or show all recent for demo convenience)
-  const myEvaluations = evaluations.filter(e => 
-    e.participantEmail.toLowerCase() === currentUser.email.toLowerCase() ||
-    e.participantName.toLowerCase().includes(currentUser.name.toLowerCase().split(' ')[0] || '')
+  const myEvaluations = evaluations.filter(
+    evaluation => evaluation.participantEmail.toLowerCase() === currentUser.email.toLowerCase()
   );
-
-  const displayEvals = myEvaluations.length > 0 ? myEvaluations : evaluations.slice(0, 3);
+  const displayEvals = myEvaluations;
   const publishedSurveys = surveys.filter(s => s.status === 'published');
 
   const handleOpenSurvey = (survey: Survey) => {
@@ -194,6 +191,7 @@ export const ParticipantDashboardView: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {displayEvals.map(ev => {
                 const act = activities.find(a => a.id === ev.activityId) || activities[0];
+                if (!act) return null;
                 return (
                   <div key={ev.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between space-y-4">
                     <div>
@@ -413,6 +411,7 @@ export const ParticipantDashboardView: React.FC = () => {
               <div className="divide-y divide-slate-100">
                 {displayEvals.map(ev => {
                   const act = activities.find(a => a.id === ev.activityId) || activities[0];
+                  if (!act) return null;
                   return (
                     <div key={ev.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                       <div>

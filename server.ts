@@ -4,12 +4,55 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { randomUUID } from 'node:crypto';
 
-dotenv.config();
+dotenv.config({ path: ['.env.local', '.env'] });
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '10mb' }));
+
+const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/+$/, '');
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+if (!supabaseUrl || !supabaseSecretKey || !supabasePublishableKey) {
+  throw new Error('SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY must be configured.');
+}
+
+let persistenceQueue = Promise.resolve();
+
+app.use((req, res, next) => {
+  const isStateMutation =
+    req.path.startsWith('/api/') &&
+    !req.path.startsWith('/api/ai/') &&
+    ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+
+  if (isStateMutation) {
+    const sendJson = res.json.bind(res);
+    let saveStarted = false;
+    res.json = ((body: unknown) => {
+      if (res.statusCode >= 400 || saveStarted) return sendJson(body);
+      saveStarted = true;
+
+      const currentSave = persistenceQueue.then(() => saveServerState());
+      persistenceQueue = currentSave.catch((error: unknown) => {
+        console.error('Failed to persist application data to Supabase:', error);
+      });
+      void currentSave.then(
+        () => sendJson(body),
+        (error: unknown) => {
+          console.error('Failed to persist application data to Supabase:', error);
+          if (!res.headersSent) {
+            res.status(500);
+            sendJson({ error: 'The database could not save this change.' });
+          }
+        }
+      );
+      return res;
+    }) as typeof res.json;
+  }
+
+  next();
+});
 
 // Initialize Gemini SDK with User-Agent as instructed by skill
 const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -104,29 +147,7 @@ export interface ServerUser {
   lastLogin: string;
 }
 
-// Pre-seeded Demo User Accounts for each role
-const users: ServerUser[] = [
-  {
-    id: 'user-001',
-    name: 'Dr. Jane C. Monfort',
-    email: 'admin@slsu.edu.ph',
-    role: 'admin',
-    department: 'Office of the Campus Director & Quality Assurance',
-    title: 'Director of Extension Services',
-    status: 'active',
-    lastLogin: '2026-05-10T08:30:00Z'
-  },
-  {
-    id: 'user-005',
-    name: 'Vicente B. Alipoyo',
-    email: 'vicente.alipoyo@gmail.com',
-    role: 'participant',
-    department: 'Hinunangan Rural Farmers Association',
-    title: 'Agri-Cooperative Participant',
-    status: 'active',
-    lastLogin: '2026-05-12T11:45:00Z'
-  }
-];
+const users: ServerUser[] = [];
 
 let systemSettings = {
   institutionName: 'Southern Leyte State University - Hinunangan Campus',
@@ -140,356 +161,73 @@ let systemSettings = {
   academicYear: '2025-2026'
 };
 
-// Pre-seeded Extension Activities for SLSU-Hinunangan
-const activities: ServerActivity[] = [
-  {
-    id: 'act-2026-001',
-    title: 'Digital Literacy & E-Commerce Training for Rural Agri-Entrepreneurs',
-    activityType: 'training',
-    description: 'Empowering local farmers and MSME food processors in Hinunangan to market native coconut products and rice varieties online through social commerce and e-wallets.',
-    date: '2026-03-12',
-    venue: 'SLSU-Hinunangan ICT Laboratory & Audio-Visual Hall',
-    targetBeneficiaries: 'Local Farmers, Fisherfolk Cooperatives, Rural MSMEs',
-    organizingDepartment: 'Faculty of Computer Studies and Information Technology (FCSIT)',
-    leadCoordinator: 'Engr. Sheryl Ann C. Barrot, MIT',
-    trainerOrSpeaker: 'Prof. Arnelyn T. Capapas & IT Extension Team',
-    status: 'completed',
-    totalTargetParticipants: 45
-  },
-  {
-    id: 'act-2026-002',
-    title: 'Sustainable Seaweed & Mud Crab Livelihood Culture Demonstration',
-    activityType: 'livelihood',
-    description: 'Hands-on livelihood module providing coastal households in Hinunangan Bay with mud crab fattening pens and resilient seaweed seed stocks.',
-    date: '2026-03-24',
-    venue: 'Barangay Ingan Coastal Community Center, Hinunangan',
-    targetBeneficiaries: 'Coastal Fisherfolk Families & Women Producers',
-    organizingDepartment: 'Office of Extension and Community Services',
-    leadCoordinator: 'Rencilyn P. Tabugon',
-    trainerOrSpeaker: 'Aquaculture Specialist Dina Mae M. Tibar',
-    status: 'completed',
-    totalTargetParticipants: 35
-  },
-  {
-    id: 'act-2026-003',
-    title: 'Seminar on Climate Resilience & Disaster Risk Preparedness for Barangays',
-    activityType: 'seminar',
-    description: 'Community symposium addressing coastal storm surge preparedness, rainwater harvesting, and solar early-warning communication tools.',
-    date: '2026-04-05',
-    venue: 'Hinunangan Municipal Gymnasium',
-    targetBeneficiaries: 'Barangay Disaster Risk Reduction Councils & Youth Leaders',
-    organizingDepartment: 'FCSIT Extension Division & SLSU DRRM Unit',
-    leadCoordinator: 'Prof. Arnelyn T. Capapas',
-    trainerOrSpeaker: 'PDRRMO Specialist & Environmental Science Faculty',
-    status: 'completed',
-    totalTargetParticipants: 60
-  },
-  {
-    id: 'act-2026-004',
-    title: 'Community Health Outreach & Computerized Medical Records Assistance',
-    activityType: 'outreach',
-    description: 'Interdisciplinary medical mission and digital health profiling for senior citizens and indigent households in upland Hinunangan.',
-    date: '2026-04-18',
-    venue: 'Barangay Banghud Health Outpost, Hinunangan',
-    targetBeneficiaries: 'Upland Residents, Senior Citizens, Barangay Health Workers',
-    organizingDepartment: 'College of Allied Health & FCSIT Extension Unit',
-    leadCoordinator: 'Dina Mae M. Tibar',
-    trainerOrSpeaker: 'University Physician & IT Volunteer Corps',
-    status: 'completed',
-    totalTargetParticipants: 80
-  },
-  {
-    id: 'act-2026-005',
-    title: 'Community Service: Mangrove Reforestation & Coastal Cleanup Drive',
-    activityType: 'community_service',
-    description: 'Youth-led ecological restoration and mangrove propagule planting along Hinunangan Marine Protected Sanctuary.',
-    date: '2026-05-02',
-    venue: 'Hinunangan Mangrove Marine Protected Sanctuary',
-    targetBeneficiaries: 'Coastal Communities, Sangguniang Kabataan, Local Fisherfolk',
-    organizingDepartment: 'SLSU Supreme Student Council & Extension Services',
-    leadCoordinator: 'Rencilyn P. Tabugon',
-    trainerOrSpeaker: 'CENRO Officer & Marine Biology Specialists',
-    status: 'active',
-    totalTargetParticipants: 50
-  }
-];
+const activities: ServerActivity[] = [];
 
-// Pre-seeded Evaluations capturing realistic feedback for SLSU-Hinunangan
-const evaluations: ServerEvaluation[] = [
-  {
-    id: 'eval-001',
-    activityId: 'act-2026-001',
-    participantName: 'Vicente B. Alipoyo',
-    participantEmail: 'vicente.alipoyo@gmail.com',
-    participantPhone: '0917-882-1401',
-    participantCategory: 'farmer_fisherfolk',
-    controlNumber: 'SLSU-2026-0101',
-    verificationMethod: 'student_id',
-    coreRatings: {
-      satisfaction: 5,
-      objectives: 5,
-      relevance: 5,
-      facilities: 4,
-      timeManagement: 4,
-      organization: 5
-    },
-    specificRatings: {
-      trainerMastery: 5,
-      learningMaterials: 5,
-      practicalApplication: 5
-    },
-    meanRating: 4.78,
-    comments: {
-      strengths: 'The trainers from FCSIT were exceptionally patient in showing us how to create GCash QR codes and Facebook marketplace posts for our copra and virgin coconut oil. The computer lab was fully airconditioned.',
-      improvements: 'The internet connection in the computer lab was interrupted twice during the afternoon session. Hope backup mobile wifi routers can be provided next time.',
-      suggestions: 'Please conduct an advanced session on photography and simple accounting using smartphone apps.'
-    },
-    sentiment: {
-      overall: 'positive',
-      score: 0.82,
-      topics: ['speaker_mastery', 'facilities', 'learning_materials', 'organization'],
-      concernUrgency: 'low'
-    },
-    submissionSource: 'online',
-    submittedAt: '2026-03-12T16:30:00Z',
-    deviceInfo: 'Desktop (Lab 3)',
-    verified: true,
-    consentAccepted: true,
-    adminFollowUpStatus: 'none'
-  },
-  {
-    id: 'eval-002',
-    activityId: 'act-2026-001',
-    participantName: 'Elena M. Castillote',
-    participantEmail: 'elena.castillote@yahoo.com',
-    participantPhone: '0928-441-9920',
-    participantCategory: 'msme_owner',
-    controlNumber: 'SLSU-2026-0102',
-    verificationMethod: 'qr_code',
-    coreRatings: {
-      satisfaction: 4,
-      objectives: 5,
-      relevance: 5,
-      facilities: 3,
-      timeManagement: 4,
-      organization: 4
-    },
-    specificRatings: {
-      trainerMastery: 5,
-      learningMaterials: 4,
-      practicalApplication: 4
-    },
-    meanRating: 4.33,
-    comments: {
-      strengths: 'Hands-on practice was very useful. We directly photographed our packaged banana chips and created product listings.',
-      improvements: 'Venue audio system had buzzing sound in the back row. Internet bandwidth was sluggish for uploading pictures.',
-      suggestions: 'Provide printed laminated step-by-step booklets so we can review them at home without internet.'
-    },
-    sentiment: {
-      overall: 'positive',
-      score: 0.65,
-      topics: ['facilities', 'speaker_mastery', 'learning_materials'],
-      concernUrgency: 'low'
-    },
-    submissionSource: 'online',
-    submittedAt: '2026-03-12T16:45:00Z',
-    deviceInfo: 'Android Mobile',
-    verified: true,
-    consentAccepted: true,
-    adminFollowUpStatus: 'none'
-  },
-  {
-    id: 'eval-003',
-    activityId: 'act-2026-002',
-    participantName: 'Rodrigo S. Mercado',
-    participantEmail: 'rodrigo.mercado@gmail.com',
-    participantPhone: '0939-112-8874',
-    participantCategory: 'farmer_fisherfolk',
-    controlNumber: 'SLSU-2026-0201',
-    verificationMethod: 'signed_attendance',
-    coreRatings: {
-      satisfaction: 5,
-      objectives: 5,
-      relevance: 5,
-      facilities: 4,
-      timeManagement: 4,
-      organization: 5
-    },
-    specificRatings: {
-      livelihoodViability: 5,
-      starterKitQuality: 5,
-      confidenceInSustaining: 5
-    },
-    meanRating: 4.78,
-    comments: {
-      strengths: 'The starter kit containing crab nursery nets and feeds was of high quality. Speaker Ma\'am Dina explained water salinity monitoring very clearly.',
-      improvements: 'Community center was very hot around noon; additional industrial electric fans would help during long lectures.',
-      suggestions: 'SLSU extension team should do a 30-day follow up visit at our shoreline to check the crab molting progress.'
-    },
-    sentiment: {
-      overall: 'positive',
-      score: 0.88,
-      topics: ['speaker_mastery', 'logistics', 'facilities', 'community_needs'],
-      concernUrgency: 'low'
-    },
-    submissionSource: 'offline_synced',
-    submittedAt: '2026-03-24T17:10:00Z',
-    syncedAt: '2026-03-24T19:30:00Z',
-    deviceInfo: 'Field Tablet (Offline Sync)',
-    verified: true,
-    consentAccepted: true,
-    adminFollowUpStatus: 'in_progress',
-    adminNotes: 'Coordinated with Aquaculture extension faculty for 30-day scheduled field visit in Ingan.'
-  },
-  {
-    id: 'eval-004',
-    activityId: 'act-2026-002',
-    participantName: 'Maria Theresa G. Rosal',
-    participantEmail: 'theresa.rosal@outlook.com',
-    participantPhone: '0908-552-3341',
-    participantCategory: 'women_cooperative',
-    controlNumber: 'SLSU-2026-0202',
-    verificationMethod: 'qr_code',
-    coreRatings: {
-      satisfaction: 4,
-      objectives: 4,
-      relevance: 5,
-      facilities: 3,
-      timeManagement: 3,
-      organization: 4
-    },
-    specificRatings: {
-      livelihoodViability: 4,
-      starterKitQuality: 4,
-      confidenceInSustaining: 4
-    },
-    meanRating: 3.89,
-    comments: {
-      strengths: 'Great demonstration of tying nursery cages. The women of our association are enthusiastic to earn secondary income.',
-      improvements: 'Program started 45 minutes late waiting for some officials. Snacks ran out for three participants in our cluster.',
-      suggestions: 'Ensure timely kickoff and check food catering headcount before distribution.'
-    },
-    sentiment: {
-      overall: 'neutral',
-      score: 0.20,
-      topics: ['time_management', 'logistics', 'community_needs'],
-      concernUrgency: 'medium'
-    },
-    submissionSource: 'offline_synced',
-    submittedAt: '2026-03-24T17:25:00Z',
-    syncedAt: '2026-03-24T19:30:00Z',
-    deviceInfo: 'Field Laptop',
-    verified: true,
-    consentAccepted: true,
-    adminFollowUpStatus: 'resolved',
-    adminNotes: 'Reminded logistics coordinator regarding exact catering buffer allowance.'
-  },
-  {
-    id: 'eval-005',
-    activityId: 'act-2026-003',
-    participantName: 'Hon. Danilo R. Tan',
-    participantEmail: 'danilo.tan.lgu@hinunangan.gov.ph',
-    participantPhone: '0919-663-8812',
-    participantCategory: 'lgu_official',
-    controlNumber: 'SLSU-2026-0301',
-    verificationMethod: 'student_id',
-    coreRatings: {
-      satisfaction: 5,
-      objectives: 5,
-      relevance: 5,
-      facilities: 5,
-      timeManagement: 5,
-      organization: 5
-    },
-    specificRatings: {
-      speakerEngagement: 5,
-      topicTimeliness: 5,
-      openForumResponsiveness: 5
-    },
-    meanRating: 5.0,
-    comments: {
-      strengths: 'Outstanding simulation of typhoon warning thresholds and rain gauge calibration. SLSU presented actual flood hazard maps of Hinunangan rivers.',
-      improvements: 'Gym acoustic echo made it hard to hear questions from the audience during open forum. Need roving cordless mics.',
-      suggestions: 'Partner with LGU Hinunangan to install solar-powered early flood sensors in upstream barangays.'
-    },
-    sentiment: {
-      overall: 'positive',
-      score: 0.95,
-      topics: ['speaker_mastery', 'facilities', 'community_needs', 'organization'],
-      concernUrgency: 'low'
-    },
-    submissionSource: 'online',
-    submittedAt: '2026-04-05T15:20:00Z',
-    deviceInfo: 'iOS Safari',
-    verified: true,
-    consentAccepted: true,
-    adminFollowUpStatus: 'none'
-  },
-  {
-    id: 'eval-006',
-    activityId: 'act-2026-004',
-    participantName: 'Corazon V. Olandria',
-    participantEmail: 'corazon.olandria@gmail.com',
-    participantPhone: '0927-334-1189',
-    participantCategory: 'community_member',
-    controlNumber: 'SLSU-2026-0401',
-    verificationMethod: 'signed_attendance',
-    coreRatings: {
-      satisfaction: 5,
-      objectives: 5,
-      relevance: 5,
-      facilities: 4,
-      timeManagement: 4,
-      organization: 5
-    },
-    specificRatings: {
-      needsAddressed: 5,
-      volunteerCourtesy: 5,
-      serviceAccessibility: 4
-    },
-    meanRating: 4.67,
-    comments: {
-      strengths: 'The student volunteers and nurses were so gentle and polite with elderly patients. The digital health record took less than 2 minutes to generate our prescription slip.',
-      improvements: 'The waiting area outside the Barangay Hall had limited shade. Under the hot sun, several seniors felt dizzy waiting for blood pressure check.',
-      suggestions: 'Please bring folding canopy tents or tarpaulin shades for outdoor patient queues in rural health missions.'
-    },
-    sentiment: {
-      overall: 'positive',
-      score: 0.70,
-      topics: ['speaker_mastery', 'facilities', 'logistics', 'community_needs'],
-      concernUrgency: 'medium'
-    },
-    submissionSource: 'offline_synced',
-    submittedAt: '2026-04-18T16:00:00Z',
-    syncedAt: '2026-04-18T18:45:00Z',
-    deviceInfo: 'Barangay Field Station',
-    verified: true,
-    consentAccepted: true,
-    adminFollowUpStatus: 'in_progress',
-    adminNotes: 'Procurement requested for two additional portable canopies for college outreach missions.'
-  }
-];
+const evaluations: ServerEvaluation[] = [];
 
-const auditLogs: AuditLog[] = [
-  {
-    id: 'log-001',
-    timestamp: '2026-04-19T08:15:20Z',
-    adminName: 'Coordinator Barrot (Sheryl Ann C.)',
-    action: 'UNMASK_PARTICIPANT_PII',
-    resourceId: 'eval-006',
-    participantControlNumber: 'SLSU-2026-0401',
-    reason: 'Investigating outdoor waiting tent shade feedback for senior citizen medical mission.'
-  },
-  {
-    id: 'log-002',
-    timestamp: '2026-04-20T10:30:14Z',
-    adminName: 'Admin Tibar (Dina Mae M.)',
-    action: 'CONFIDENTIAL_FOLLOW_UP',
-    resourceId: 'eval-003',
-    participantControlNumber: 'SLSU-2026-0201',
-    reason: 'Arranging technical assistance and site inspection for mud crab fattening pens in Ingan.'
+const auditLogs: AuditLog[] = [];
+
+async function getAuthenticatedAccount(accessToken: string): Promise<ServerUser | null> {
+  if (!supabaseUrl || !supabasePublishableKey) {
+    throw new Error('Supabase authentication configuration is missing.');
   }
-];
+
+  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { apikey: supabasePublishableKey, Authorization: `Bearer ${accessToken}` }
+  });
+  if (!response.ok) return null;
+
+  const authUser = await response.json() as { id?: string };
+  if (!authUser.id) return null;
+  const account = users.find(user => user.id === authUser.id);
+  if (!account || account.status !== 'active') return null;
+
+  return account;
+}
+
+app.use('/api', async (req, res, next) => {
+  if (['/auth/login', '/auth/me', '/auth/logout'].includes(req.path)) return next();
+
+  const accessToken = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!accessToken) return res.status(401).json({ error: 'A valid sign-in session is required.' });
+
+  try {
+    const account = await getAuthenticatedAccount(accessToken);
+    if (!account) return res.status(401).json({ error: 'Your sign-in session is invalid or has expired.' });
+    res.locals.user = account;
+
+    const adminOnly =
+      req.path.startsWith('/users') ||
+      (req.path.startsWith('/settings') && req.method !== 'GET') ||
+      req.path.startsWith('/audit-logs') ||
+      req.path.startsWith('/admin/') ||
+      req.path.startsWith('/trainer/') ||
+      req.path.startsWith('/imports/') ||
+      req.path.startsWith('/ai/') ||
+      (req.path.startsWith('/activities') && req.method !== 'GET') ||
+      (req.path.startsWith('/forms') && req.method !== 'GET') ||
+      (req.path.startsWith('/surveys') && (
+        (req.method === 'GET' && req.path.includes('/responses')) ||
+        (req.method !== 'GET' && !(req.method === 'POST' && req.path.endsWith('/responses')))
+      )) ||
+      (req.path.startsWith('/theme') && req.method !== 'GET') ||
+      (req.path.startsWith('/evaluations') && req.method === 'PATCH');
+    if (adminOnly && account.role !== 'admin') {
+      return res.status(403).json({ error: 'Administrator access is required.' });
+    }
+
+    if (req.path === '/evaluations' && req.method === 'POST' &&
+      typeof req.body?.participantEmail === 'string' &&
+      req.body.participantEmail.toLowerCase() !== account.email.toLowerCase()) {
+      return res.status(403).json({ error: 'You can only submit evaluations for your signed-in account.' });
+    }
+
+    return next();
+  } catch (error) {
+    console.error('Supabase API authentication failed:', error);
+    return res.status(502).json({ error: 'The authentication service is unavailable.' });
+  }
+});
 
 // Helper for local heuristic sentiment & topic classification
 function analyzeSentimentAndTopics(commentsText: string) {
@@ -596,7 +334,10 @@ app.post('/api/activities', (req, res) => {
 // 3. Get evaluations (supports filter by activityId)
 app.get('/api/evaluations', (req, res) => {
   const { activityId, source } = req.query;
-  let list = [...evaluations];
+  const account = res.locals.user as ServerUser;
+  let list = account.role === 'admin'
+    ? [...evaluations]
+    : evaluations.filter(evaluation => evaluation.participantEmail.toLowerCase() === account.email.toLowerCase());
   if (activityId && typeof activityId === 'string') {
     list = list.filter(e => e.activityId === activityId);
   }
@@ -609,6 +350,11 @@ app.get('/api/evaluations', (req, res) => {
 // 4. Submit single evaluation
 app.post('/api/evaluations', (req, res) => {
   const payload = req.body;
+  const account = res.locals.user as ServerUser;
+  if (account.role !== 'admin') {
+    payload.participantName = account.name;
+    payload.participantEmail = account.email;
+  }
   if (!payload.activityId || !payload.participantName || !payload.participantEmail) {
     res.status(400).json({ error: 'Missing mandatory fields (activityId, participantName, participantEmail)' });
     return;
@@ -776,6 +522,12 @@ app.post('/api/sync', (req, res) => {
     res.status(400).json({ error: 'Batch must be an array of evaluations' });
     return;
   }
+  const account = res.locals.user as ServerUser;
+  if (account.role !== 'admin' && batch.some((item: Partial<ServerEvaluation>) =>
+    typeof item.participantEmail !== 'string' || item.participantEmail.toLowerCase() !== account.email.toLowerCase()
+  )) {
+    return res.status(403).json({ error: 'You can only synchronize evaluations for your signed-in account.' });
+  }
 
   const results: { syncedCount: number; duplicateCount: number; items: ServerEvaluation[] } = {
     syncedCount: 0,
@@ -814,8 +566,8 @@ app.post('/api/sync', (req, res) => {
       formId: item.formId,
       formSnapshot: item.formSnapshot || evaluationForms.find(form => form.id === item.formId),
       customAnswers: item.customAnswers,
-      participantName: item.participantName!,
-      participantEmail: item.participantEmail!,
+      participantName: account.role === 'admin' ? item.participantName! : account.name,
+      participantEmail: account.role === 'admin' ? item.participantEmail! : account.email,
       participantPhone: item.participantPhone || '',
       participantCategory: item.participantCategory || 'community_member',
       controlNumber: item.controlNumber || `SLSU-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -918,6 +670,10 @@ app.post('/api/ai/executive-report', async (req, res) => {
     res.status(400).json({ error: 'No evaluations available to generate report.' });
     return;
   }
+  if (!ai) {
+    res.status(503).json({ error: 'AI reporting is unavailable because GEMINI_API_KEY is not configured.' });
+    return;
+  }
 
   const ratedEvals = targetEvals.filter(e => e.meanRating > 0);
   const avgRating = ratedEvals.length > 0
@@ -981,103 +737,33 @@ Return only valid JSON.
 `;
 
   try {
-    if (ai) {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.3
-        }
-      });
-
-      const responseText = response.text || '';
-      try {
-        const parsed = JSON.parse(responseText);
-        res.json({
-          source: 'gemini-3.8-flash',
-          report: parsed
-        });
-        return;
-      } catch (parseErr) {
-        console.warn('Failed to parse Gemini JSON, providing fallback structured report', parseErr);
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.3
       }
+    });
+
+    const responseText = response.text || '';
+    try {
+      const parsed = JSON.parse(responseText);
+      res.json({
+        source: 'gemini-3.8-flash',
+        report: parsed
+      });
+      return;
+    } catch (parseErr) {
+      console.error('Gemini returned an invalid executive report:', parseErr);
+      res.status(502).json({ error: 'AI returned an invalid executive report.' });
+      return;
     }
   } catch (apiError) {
-    console.error('Gemini API call failed, falling back to local heuristic report generator:', apiError);
+    console.error('Gemini executive report request failed:', apiError);
+    res.status(502).json({ error: 'AI could not generate the executive report.' });
+    return;
   }
-
-  // Graceful Fallback Report (Heuristic synthesis so the user is never left hanging)
-  const fallbackReport = {
-    reportTitle: targetActivity
-      ? `Executive Evaluation Report: ${targetActivity.title}`
-      : 'Institutional Extension Services Evaluation & Analytics Report',
-    generatedDate: new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }),
-    executiveSummary: `This executive report evaluates extension activities facilitated by Southern Leyte State University (SLSU) - Hinunangan Campus. Across ${totalCount} validated participant evaluations, the overall satisfaction index reached an impressive ${avgRating} / 5.0. Analysis indicates high community reception for practical, hands-on skill delivery, accompanied by clear logistical recommendations regarding rural facility conditioning and connectivity.`,
-    keyPerformanceIndicators: [
-      { metric: 'Overall Mean Satisfaction', value: `${avgRating} / 5.0`, status: avgRating >= 4.0 ? 'Excellent' : 'Good', benchmark: 'Target >= 4.00' },
-      { metric: 'Positive Feedback Ratio', value: `${Math.round((positiveCount/totalCount)*100)}%`, status: 'Excellent', benchmark: 'Target >= 80%' },
-      { metric: 'Data Collection Validity Index', value: '98.5%', status: 'Excellent', benchmark: 'Zero unverified duplicates' }
-    ],
-    recurringStrengths: [
-      {
-        topic: 'Trainer Mastery & Faculty Engagement',
-        summary: 'Participants commended the patience and clarity of SLSU faculty trainers (FCSIT team) in translating technical skills into vernacular understanding.',
-        sentimentRatio: '94% Positive'
-      },
-      {
-        topic: 'Relevance to Local Livelihood Needs',
-        summary: 'Practical modules in e-commerce, agriculture, and coastal aquaculture aligned directly with household income-generation priorities in Hinunangan.',
-        sentimentRatio: '91% Positive'
-      }
-    ],
-    criticalWeaknesses: [
-      {
-        topic: 'Venue Internet & Technology Infrastructure',
-        summary: 'Intermittent broadband in computer laboratories and remote community centers hindered file uploads during digital training modules.',
-        severity: 'Medium'
-      },
-      {
-        topic: 'Field Outreach Logistics & Queue Shading',
-        summary: 'In outdoor community health missions, elderly participants reported discomfort from sun exposure and insufficient waiting canopy shade.',
-        severity: 'Medium'
-      }
-    ],
-    aiActionableRecommendations: [
-      {
-        category: 'Logistics & Facilities',
-        recommendation: 'Deploy dedicated portable mobile Wi-Fi routers and procurement of heavy-duty outdoor canopy tents for field barangay missions.',
-        expectedImpact: 'Ensures zero session downtime and significantly improves patient comfort in rural missions.',
-        responsibleUnit: 'General Services Office & Extension Logistics Team',
-        priority: 'High'
-      },
-      {
-        category: 'Curriculum & Content',
-        recommendation: 'Produce waterproof, printed step-by-step visual training guides (manuals) so beneficiaries can practice offline at home.',
-        expectedImpact: 'Sustains learning retention beyond the physical seminar day.',
-        responsibleUnit: 'Faculty of Computer Studies and Information Technology (FCSIT)',
-        priority: 'Medium'
-      },
-      {
-        category: 'Community Partnership',
-        recommendation: 'Establish formal 30-day and 60-day post-activity monitoring schedules with partner Barangay Local Government Units.',
-        expectedImpact: 'Measures long-term economic and behavioral adoption of university extension services.',
-        responsibleUnit: 'Office of Extension Services & Municipal LGU Liaison',
-        priority: 'High'
-      }
-    ],
-    evidenceQuotes: [
-      { quote: 'The trainers from FCSIT were exceptionally patient in showing us how to create QR codes and Facebook marketplace posts.', theme: 'Trainer' },
-      { quote: 'Venue audio system had buzzing sound and internet bandwidth was sluggish for uploading pictures.', theme: 'Facilities' },
-      { quote: 'Please bring folding canopy tents or tarpaulin shades for outdoor patient queues in rural health missions.', theme: 'Logistics' }
-    ],
-    policyNotice: 'This report was synthesized using AI-assisted natural language processing as decision support for the SLSU-Hinunangan Extension Advisory Council, in full compliance with the Data Privacy Act of 2012.'
-  };
-
-  res.json({
-    source: 'local-analytics-engine',
-    report: fallbackReport
-  });
 });
 
 // 9. AI Quick Insights & Natural Language Query Endpoint
@@ -1085,6 +771,10 @@ app.post('/api/ai/quick-insights', async (req, res) => {
   const { question } = req.body;
   if (!question) {
     res.status(400).json({ error: 'Question parameter is required.' });
+    return;
+  }
+  if (!ai) {
+    res.status(503).json({ error: 'AI insights are unavailable because GEMINI_API_KEY is not configured.' });
     return;
   }
 
@@ -1109,82 +799,85 @@ Provide a concise, direct, evidence-based answer (2-4 paragraphs) citing real pa
 `;
 
   try {
-    if (ai) {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: { temperature: 0.2 }
-      });
-      res.json({ answer: response.text });
-      return;
-    }
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: { temperature: 0.2 }
+    });
+    res.json({ answer: response.text });
+    return;
   } catch (err) {
     console.error('Gemini quick insights error:', err);
+    res.status(502).json({ error: 'AI could not answer this question.' });
+    return;
   }
-
-  res.json({
-    answer: `Based on participant feedback across SLSU-Hinunangan extension programs:
-1. Participants consistently praise the practical dedication of FCSIT faculty and trainers, especially their patience in hands-on demonstrations.
-2. The primary recurring bottleneck is technology infrastructure (unreliable internet connectivity during digital training sessions) and field logistics (need for outdoor canopy shades in health outreach).
-Actionable recommendation: Equip extension teams with portable offline training kits and offline sync devices, and coordinate with barangay captains for venue ventilation and shaded queue management.`
-  });
 });
 
 // ==========================================
-// AUTHENTICATION & DEMO ACCOUNTS ENDPOINTS
+// AUTHENTICATION ENDPOINTS
 // ==========================================
-app.post('/api/auth/login', (req, res) => {
-  const { email, password, role } = req.body;
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
+  }
 
-  // Direct demo role quick-login
-  if (role) {
-    const demoUser = users.find(u => u.role === role);
-    if (demoUser) {
-      demoUser.lastLogin = new Date().toISOString();
-      return res.json({
-        token: `demo-token-${demoUser.id}-${Date.now()}`,
-        user: demoUser
+  try {
+    const authResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: supabasePublishableKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim(), password })
+    });
+    if (!authResponse.ok) return res.status(401).json({ error: 'Invalid email or password.' });
+
+    const authData = await authResponse.json() as { access_token?: string; user?: { id?: string } };
+    const user = users.find(account => account.id === authData.user?.id);
+    if (!user) return res.status(403).json({ error: 'Your Supabase account does not have an application profile yet.' });
+    if (user.status !== 'active') return res.status(403).json({ error: 'This account has been deactivated.' });
+    if (!authData.access_token) throw new Error('Supabase authentication response did not include an access token.');
+
+    user.lastLogin = new Date().toISOString();
+    return res.json({ token: authData.access_token, user });
+  } catch (error) {
+    console.error('Supabase sign-in failed:', error);
+    return res.status(502).json({ error: 'The authentication service is unavailable.' });
+  }
+});
+
+app.get('/api/auth/me', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (!token) return res.status(401).json({ error: 'A valid sign-in session is required.' });
+
+  try {
+    const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { apikey: supabasePublishableKey, Authorization: `Bearer ${token}` }
+    });
+    if (!authResponse.ok) return res.status(401).json({ error: 'Your sign-in session has expired.' });
+
+    const authUser = await authResponse.json() as { id?: string };
+    const user = users.find(account => account.id === authUser.id);
+    if (!user || user.status !== 'active') return res.status(403).json({ error: 'No active application profile is available for this account.' });
+    return res.json({ user });
+  } catch (error) {
+    console.error('Supabase session validation failed:', error);
+    return res.status(502).json({ error: 'The authentication service is unavailable.' });
+  }
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  if (token) {
+    try {
+      await fetch(`${supabaseUrl}/auth/v1/logout`, {
+        method: 'POST',
+        headers: { apikey: supabasePublishableKey, Authorization: `Bearer ${token}` }
       });
+    } catch (error) {
+      console.error('Supabase sign-out failed:', error);
+      return res.status(502).json({ error: 'The authentication service is unavailable.' });
     }
   }
-
-  // Standard email login (demo passwords accept anything in demo environment)
-  if (!email) {
-    return res.status(400).json({ error: 'Email address is required.' });
-  }
-
-  const user = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
-  if (!user) {
-    return res.status(401).json({ error: 'User account not found with this email.' });
-  }
-
-  if (user.status === 'inactive') {
-    return res.status(403).json({ error: 'This account has been deactivated by the system administrator.' });
-  }
-
-  user.lastLogin = new Date().toISOString();
-  res.json({
-    token: `token-${user.id}-${Date.now()}`,
-    user
-  });
-});
-
-app.get('/api/auth/me', (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    // Return default demo user if unauthenticated
-    return res.json({ user: users[0] });
-  }
-
-  const token = authHeader.replace('Bearer ', '');
-  const parts = token.split('-');
-  const userId = parts.length > 2 ? `${parts[1]}-${parts[2]}` : 'user-001';
-  const user = users.find(u => u.id === userId) || users[0];
-  res.json({ user });
-});
-
-app.post('/api/auth/logout', (_req, res) => {
-  res.json({ success: true, message: 'Logged out successfully.' });
+  return res.json({ success: true });
 });
 
 // ==========================================
@@ -1211,7 +904,7 @@ app.patch('/api/users/:id/role', (req, res) => {
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Super Admin (Dr. Jane C. Monfort)',
+    adminName: 'Administrator',
     action: 'USER_ROLE_MODIFIED',
     resourceId: id,
     reason: `Updated user ${targetUser.email} to role: ${targetUser.role}, status: ${targetUser.status}`
@@ -1220,21 +913,46 @@ app.patch('/api/users/:id/role', (req, res) => {
   res.json(targetUser);
 });
 
-app.post('/api/users', (req, res) => {
+app.post('/api/users', async (req, res) => {
   const { name, email, role, department, title } = req.body;
-  if (!name || !email) {
+  if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || !email.trim()) {
     return res.status(400).json({ error: 'Name and email are required fields.' });
   }
 
-  const existing = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  const normalizedEmail = email.toLowerCase().trim();
+  const existing = users.find(u => u.email.toLowerCase() === normalizedEmail);
   if (existing) {
     return res.status(409).json({ error: 'A user account with this email already exists.' });
   }
 
+  let invitedUser: { id?: string };
+  try {
+    const inviteResponse = await fetch(`${supabaseUrl}/auth/v1/invite`, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseSecretKey,
+        Authorization: `Bearer ${supabaseSecretKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email: normalizedEmail, data: { name: name.trim() } })
+    });
+    if (!inviteResponse.ok) {
+      const errorText = await inviteResponse.text();
+      console.error(`Supabase invitation failed (${inviteResponse.status}): ${errorText}`);
+      return res.status(502).json({ error: 'Supabase could not send the account invitation.' });
+    }
+    const inviteData = await inviteResponse.json() as { id?: string; user?: { id?: string } };
+    invitedUser = { id: inviteData.id || inviteData.user?.id };
+  } catch (error) {
+    console.error('Supabase invitation request failed:', error);
+    return res.status(502).json({ error: 'The authentication service is unavailable.' });
+  }
+  if (!invitedUser.id) return res.status(502).json({ error: 'Supabase invitation did not return a user ID.' });
+
   const newUser: ServerUser = {
-    id: `user-${Date.now()}`,
-    name,
-    email: email.toLowerCase().trim(),
+    id: invitedUser.id,
+    name: name.trim(),
+    email: normalizedEmail,
     role: role || 'participant',
     department: department || 'SLSU Hinunangan',
     title: title || 'Staff Member',
@@ -1285,15 +1003,15 @@ app.get('/api/trainer/metrics', (req, res) => {
 
   const avgMastery = masteryScores.length > 0
     ? Number((masteryScores.reduce((a, b) => a + b, 0) / masteryScores.length).toFixed(2))
-    : 4.85;
+    : 0;
 
   const avgMaterials = materialsScores.length > 0
     ? Number((materialsScores.reduce((a, b) => a + b, 0) / materialsScores.length).toFixed(2))
-    : 4.70;
+    : 0;
 
   const avgApplication = applicationScores.length > 0
     ? Number((applicationScores.reduce((a, b) => a + b, 0) / applicationScores.length).toFixed(2))
-    : 4.80;
+    : 0;
 
   const comments = trainerEvals.map(e => ({
     activityId: e.activityId,
@@ -1322,11 +1040,9 @@ app.get('/api/trainer/metrics', (req, res) => {
 // PARTICIPANT PERSONAL EVALUATIONS ENDPOINT
 // ==========================================
 app.get('/api/participant/evaluations', (req, res) => {
-  const { email } = req.query;
-  if (!email || typeof email !== 'string') {
-    return res.json(evaluations);
-  }
-
+  const account = res.locals.user as ServerUser;
+  const requestedEmail = typeof req.query.email === 'string' ? req.query.email : account.email;
+  const email = account.role === 'admin' ? requestedEmail : account.email;
   const participantEvals = evaluations.filter(
     e => e.participantEmail.toLowerCase() === email.toLowerCase().trim()
   );
@@ -1365,138 +1081,13 @@ app.patch('/api/settings', (req, res) => {
 // ==========================================
 // EVALUATION FORM BUILDER DATA & ENDPOINTS
 // ==========================================
-let evaluationForms: any[] = [
-  {
-    id: 'form-001',
-    title: 'Institutional Standard Extension Evaluation Form',
-    description: 'Universal evaluation rubric aligned with AACCUP Level III accreditation and ISO 9001:2015 extension service standards.',
-    instructions: 'Please answer each dimension objectively using the 1 to 5 scale where 5 is Strongly Agree and 1 is Strongly Disagree.',
-    status: 'published',
-    version: 1,
-    targetActivityType: 'all',
-    createdAt: '2026-01-15T08:00:00Z',
-    updatedAt: '2026-03-01T10:00:00Z',
-    sections: [
-      {
-        id: 'sec-1',
-        title: 'I. Program Content & Timeliness',
-        description: 'Relevance of the curriculum to community needs',
-        questions: [
-          {
-            id: 'q-satisfaction',
-            label: 'Overall Program Satisfaction',
-            description: 'Overall, how satisfied are you with this extension activity?',
-            type: 'rating_scale',
-            required: true,
-            scaleMin: 1,
-            scaleMax: 5,
-            scaleMinLabel: 'Very Dissatisfied',
-            scaleMaxLabel: 'Very Satisfied',
-            weight: 20
-          },
-          {
-            id: 'q-objectives',
-            label: 'Attainment of Extension Objectives',
-            description: 'The stated goals and community deliverables of the activity were achieved.',
-            type: 'rating_scale',
-            required: true,
-            scaleMin: 1,
-            scaleMax: 5,
-            weight: 20
-          },
-          {
-            id: 'q-relevance',
-            label: 'Practical Relevance & Community Applicability',
-            description: 'The topics and skills taught are applicable to our daily livelihood or community development.',
-            type: 'rating_scale',
-            required: true,
-            scaleMin: 1,
-            scaleMax: 5,
-            weight: 20
-          }
-        ]
-      },
-      {
-        id: 'sec-2',
-        title: 'II. Venue, Logistics & Delivery',
-        description: 'Quality of facilities, instructional aids, and time management',
-        questions: [
-          {
-            id: 'q-facilities',
-            label: 'Facilities, Venue & Equipment',
-            description: 'The venue was conducive, ventilated, and equipped with necessary demonstration tools.',
-            type: 'rating_scale',
-            required: true,
-            scaleMin: 1,
-            scaleMax: 5,
-            weight: 15
-          },
-          {
-            id: 'q-timeManagement',
-            label: 'Time Management & Program Pacing',
-            description: 'The program started on time and paced discussions efficiently without rushing.',
-            type: 'rating_scale',
-            required: true,
-            scaleMin: 1,
-            scaleMax: 5,
-            weight: 15
-          },
-          {
-            id: 'q-recommendation',
-            label: 'Would you recommend this program to fellow community members?',
-            type: 'single_choice',
-            required: true,
-            options: ['Definitely Yes', 'Probably Yes', 'Neutral', 'No']
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'form-002',
-    title: 'Livelihood & Hands-On Skills Workshop Rubric',
-    description: 'Specialized evaluation rubric for practical agro-industrial demonstrations, mud crab culture, and coconut food processing.',
-    instructions: 'Evaluate the clarity of practical drills and viability of starting a community micro-enterprise.',
-    status: 'published',
-    version: 1,
-    targetActivityType: 'livelihood',
-    createdAt: '2026-02-10T09:00:00Z',
-    updatedAt: '2026-02-15T11:00:00Z',
-    sections: [
-      {
-        id: 'sec-livelihood',
-        title: 'Technical Mastery & Field Demonstration',
-        questions: [
-          {
-            id: 'q-marketViability',
-            label: 'Market & Economic Viability of Production',
-            description: 'The livelihood enterprise demonstrates high potential for income generation in Hinunangan.',
-            type: 'rating_scale',
-            required: true,
-            scaleMin: 1,
-            scaleMax: 5
-          },
-          {
-            id: 'q-handsonEquipment',
-            label: 'Sufficiency of Practical Hands-on Kits',
-            description: 'Demonstration materials, seedlings, and tools were adequately provided to trainees.',
-            type: 'rating_scale',
-            required: true,
-            scaleMin: 1,
-            scaleMax: 5
-          }
-        ]
-      }
-    ]
-  }
-];
+let evaluationForms: any[] = [];
 
 // Forms endpoints
 const completedEvaluationImports = new Map<string, { form: any; activity: ServerActivity }>();
 const completedFormImports = new Map<string, any>();
 
 app.post('/api/imports/form', (req, res) => {
-  if (req.headers['x-user-role'] !== 'admin') return res.status(403).json({ error: 'Only an administrator can import evaluation forms.' });
   const { requestId, title, description, instructions, sections, originalFileName } = req.body || {};
   if (typeof requestId !== 'string' || requestId.length < 8 || requestId.length > 100) return res.status(400).json({ error: 'A valid import request ID is required.' });
   const priorForm = completedFormImports.get(requestId);
@@ -1537,10 +1128,6 @@ app.post('/api/imports/form', (req, res) => {
 });
 
 app.post('/api/imports/evaluation', (req, res) => {
-  if (req.headers['x-user-role'] !== 'admin') {
-    return res.status(403).json({ error: 'Only an administrator can import evaluation activities.' });
-  }
-
   const { requestId, title, formTitle, description, instructions, activityType, sections } = req.body || {};
   if (typeof requestId !== 'string' || requestId.length < 8 || requestId.length > 100) {
     return res.status(400).json({ error: 'A valid import request ID is required.' });
@@ -1619,7 +1206,8 @@ app.post('/api/imports/evaluation', (req, res) => {
 });
 
 app.get('/api/forms', (_req, res) => {
-  res.json(evaluationForms);
+  const account = res.locals.user as ServerUser;
+  res.json(account.role === 'admin' ? evaluationForms : evaluationForms.filter(form => form.status === 'published'));
 });
 
 const validateFormDefinition = (form: any): string | null => {
@@ -1664,7 +1252,6 @@ const validateFormDefinition = (form: any): string | null => {
 };
 
 app.post('/api/forms', (req, res) => {
-  if (req.headers['x-user-role'] !== 'admin') return res.status(403).json({ error: 'Only administrators can create forms.' });
   const payload = { ...req.body, status: req.body.status || 'draft', sections: req.body.sections || [] };
   const validationError = validateFormDefinition(payload);
   if (validationError) return res.status(400).json({ error: validationError });
@@ -1692,7 +1279,7 @@ app.post('/api/forms', (req, res) => {
   auditLogs.unshift({
     id: `log-${randomUUID()}`,
     timestamp: now,
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'FORM_CREATED',
     resourceId: newForm.id,
     reason: `Created new evaluation form "${newForm.title}"`
@@ -1701,7 +1288,6 @@ app.post('/api/forms', (req, res) => {
 });
 
 app.put('/api/forms/:id', (req, res) => {
-  if (req.headers['x-user-role'] !== 'admin') return res.status(403).json({ error: 'Only administrators can edit or publish forms.' });
   const idx = evaluationForms.findIndex(f => f.id === req.params.id);
   if (idx === -1) {
     res.status(404).json({ error: 'Form not found' });
@@ -1733,7 +1319,7 @@ app.put('/api/forms/:id', (req, res) => {
   auditLogs.unshift({
     id: `log-${randomUUID()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'FORM_UPDATED',
     resourceId: req.params.id,
     reason: `Modified form structure & question rubric for "${evaluationForms[idx].title}"`
@@ -1742,7 +1328,6 @@ app.put('/api/forms/:id', (req, res) => {
 });
 
 app.delete('/api/forms/:id', (req, res) => {
-  if (req.headers['x-user-role'] !== 'admin') return res.status(403).json({ error: 'Only administrators can delete forms.' });
   const idx = evaluationForms.findIndex(f => f.id === req.params.id);
   if (idx === -1) {
     res.status(404).json({ error: 'Form not found' });
@@ -1755,7 +1340,7 @@ app.delete('/api/forms/:id', (req, res) => {
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'FORM_DELETED',
     resourceId: req.params.id,
     reason: `Removed evaluation form "${deleted.title}"`
@@ -1764,7 +1349,6 @@ app.delete('/api/forms/:id', (req, res) => {
 });
 
 app.post('/api/forms/:id/duplicate', (req, res) => {
-  if (req.headers['x-user-role'] !== 'admin') return res.status(403).json({ error: 'Only administrators can duplicate forms.' });
   const orig = evaluationForms.find(f => f.id === req.params.id);
   if (!orig) {
     res.status(404).json({ error: 'Form not found' });
@@ -1783,7 +1367,7 @@ app.post('/api/forms/:id/duplicate', (req, res) => {
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'FORM_DUPLICATED',
     resourceId: cloned.id,
     reason: `Cloned template from "${orig.title}"`
@@ -1794,122 +1378,15 @@ app.post('/api/forms/:id/duplicate', (req, res) => {
 // ==========================================
 // SURVEY MANAGEMENT DATA & ENDPOINTS
 // ==========================================
-let surveys: any[] = [
-  {
-    id: 'survey-001',
-    title: 'Community Needs Assessment & Tech Readiness Survey 2026',
-    description: 'Annual stakeholder survey assessing digital literacy, solar adoption, and internet connectivity among Hinunangan coastal communities.',
-    instructions: 'Responses may be submitted anonymously to protect beneficiary privacy under RA 10173.',
-    status: 'published',
-    isAnonymous: true,
-    targetAudience: 'Barangay Captains, Fisherfolk Leaders & Rural Women',
-    startDate: '2026-01-10',
-    endDate: '2026-06-30',
-    createdAt: '2026-01-08T10:00:00Z',
-    questions: [
-      {
-        id: 'sq-1',
-        title: 'Priority Skills Needed by Your Household / Barangay',
-        description: 'Which extension skills would deliver the highest economic benefit?',
-        type: 'multiple_choice',
-        required: true,
-        options: ['Digital E-Commerce & GCash', 'Mud Crab & Aquaculture', 'Food Processing & Packaging', 'Solar & Renewable Maintenance', 'Disaster First Aid & Early Warning']
-      },
-      {
-        id: 'sq-2',
-        title: 'Household Internet & Mobile Connectivity Status',
-        description: 'Rate the reliability of cellular network in your barangay',
-        type: 'rating_scale',
-        required: true
-      },
-      {
-        id: 'sq-3',
-        title: 'Preferred Extension Training Schedule',
-        description: 'What days of the week work best for community workshops?',
-        type: 'single_choice',
-        required: true,
-        options: ['Saturday Mornings', 'Sunday Afternoons', 'Weekday Evenings (5:00 PM)', 'Flexible Modular']
-      },
-      {
-        id: 'sq-4',
-        title: 'Additional Community Suggestions for SLSU Faculty',
-        description: 'Share any localized challenges or equipment requests',
-        type: 'text',
-        required: false
-      }
-    ]
-  },
-  {
-    id: 'survey-002',
-    title: 'Agricultural Cooperative Training Preferences Survey',
-    description: 'Consultation with local coconut farmers and rice growers for modern mechanization and organic fertilizer transfer.',
-    instructions: 'Please answer frankly on behalf of your cooperative members.',
-    status: 'published',
-    isAnonymous: false,
-    targetAudience: 'Registered Agri-Cooperatives in Southern Leyte',
-    startDate: '2026-02-01',
-    endDate: '2026-07-15',
-    createdAt: '2026-01-28T14:00:00Z',
-    questions: [
-      {
-        id: 'sq-c1',
-        title: 'Interest in Smart Irrigation & Soil Testing Kits',
-        type: 'rating_scale',
-        required: true
-      },
-      {
-        id: 'sq-c2',
-        title: 'Primary Hurdle Confronting Your Farm Operation',
-        type: 'single_choice',
-        required: true,
-        options: ['High Cost of Commercial Fertilizers', 'Lack of Cold Storage Logistics', 'Fluctuating Copra Gate Prices', 'Pest Outbreaks']
-      }
-    ]
-  }
-];
+let surveys: any[] = [];
 
-let surveyResponses: any[] = [
-  {
-    id: 'sr-001',
-    surveyId: 'survey-001',
-    isAnonymous: true,
-    answers: {
-      'sq-1': ['Digital E-Commerce & GCash', 'Food Processing & Packaging'],
-      'sq-2': 4,
-      'sq-3': 'Saturday Mornings',
-      'sq-4': 'Please bring hands-on coconut oil vacuum sealers for demonstration.'
-    },
-    submittedAt: '2026-03-15T09:30:00Z'
-  },
-  {
-    id: 'sr-002',
-    surveyId: 'survey-001',
-    isAnonymous: true,
-    answers: {
-      'sq-1': ['Mud Crab & Aquaculture', 'Solar & Renewable Maintenance'],
-      'sq-2': 3,
-      'sq-3': 'Saturday Mornings',
-      'sq-4': 'More field visits to Barangay Ingan mangrove areas.'
-    },
-    submittedAt: '2026-03-22T14:15:00Z'
-  },
-  {
-    id: 'sr-003',
-    surveyId: 'survey-002',
-    isAnonymous: false,
-    respondentName: 'Vicente B. Alipoyo',
-    respondentEmail: 'vicente.alipoyo@gmail.com',
-    answers: {
-      'sq-c1': 5,
-      'sq-c2': 'High Cost of Commercial Fertilizers'
-    },
-    submittedAt: '2026-03-25T11:00:00Z'
-  }
-];
+let surveyResponses: any[] = [];
 
 // Survey endpoints
 app.get('/api/surveys', (_req, res) => {
-  const enhanced = surveys.map(s => {
+  const account = res.locals.user as ServerUser;
+  const visibleSurveys = account.role === 'admin' ? surveys : surveys.filter(survey => survey.status === 'published');
+  const enhanced = visibleSurveys.map(s => {
     const respCount = surveyResponses.filter(r => r.surveyId === s.id).length;
     return { ...s, responsesCount: respCount };
   });
@@ -1934,7 +1411,7 @@ app.post('/api/surveys', (req, res) => {
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'SURVEY_CREATED',
     resourceId: newSurvey.id,
     reason: `Registered stakeholder survey "${newSurvey.title}"`
@@ -1952,7 +1429,7 @@ app.put('/api/surveys/:id', (req, res) => {
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'SURVEY_UPDATED',
     resourceId: req.params.id,
     reason: `Updated survey configuration for "${surveys[idx].title}"`
@@ -1970,7 +1447,7 @@ app.delete('/api/surveys/:id', (req, res) => {
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'SURVEY_DELETED',
     resourceId: req.params.id,
     reason: `Archived/deleted survey "${deleted.title}"`
@@ -1989,12 +1466,16 @@ app.post('/api/surveys/:id/responses', (req, res) => {
     res.status(404).json({ error: 'Survey not found' });
     return;
   }
+  const account = res.locals.user as ServerUser;
+  if (account.role !== 'admin' && survey.status !== 'published') {
+    return res.status(409).json({ error: 'This survey is not accepting responses.' });
+  }
   const newResp = {
     id: `sr-${Date.now()}`,
     surveyId: req.params.id,
     isAnonymous: survey.isAnonymous,
-    respondentName: survey.isAnonymous ? undefined : req.body.respondentName,
-    respondentEmail: survey.isAnonymous ? undefined : req.body.respondentEmail,
+    respondentName: survey.isAnonymous ? undefined : account.name,
+    respondentEmail: survey.isAnonymous ? undefined : account.email,
     answers: req.body.answers || {},
     submittedAt: new Date().toISOString()
   };
@@ -2023,29 +1504,7 @@ const DEFAULT_THEME = {
   sidebarLogoUrl: '',
   sidebarLogoIcon: 'building',
   sidebarLogoShape: 'rounded',
-  sidebarLogoHistory: [
-    {
-      id: 'logo-hist-001',
-      sourceType: 'preset',
-      value: 'building',
-      name: 'SLSU Institutional Campus Landmark',
-      timestamp: '2026-05-10T08:00:00Z'
-    },
-    {
-      id: 'logo-hist-002',
-      sourceType: 'preset',
-      value: 'shield',
-      name: 'AACCUP Quality Assurance Shield',
-      timestamp: '2026-05-08T14:30:00Z'
-    },
-    {
-      id: 'logo-hist-003',
-      sourceType: 'preset',
-      value: 'graduation',
-      name: 'Academic Graduation Faculty Emblem',
-      timestamp: '2026-05-05T09:15:00Z'
-    }
-  ],
+  sidebarLogoHistory: [],
   sidebarActiveItemBg: '#022c22',
   sidebarActiveItemText: '#ffffff',
   sidebarBorderColor: '#e2e8f0',
@@ -2091,12 +1550,6 @@ app.get('/api/theme', (_req, res) => {
 });
 
 app.post('/api/theme', (req, res) => {
-  // Authorization check: Only administrators can modify global appearance & typography
-  const userRole = req.headers['x-user-role'];
-  if (userRole === 'participant') {
-    return res.status(403).json({ error: 'Unauthorized: Only system administrators may modify global typography and theme settings.' });
-  }
-
   // Validate typography bounds and font colors if provided
   if (req.body.typography) {
     const typo = req.body.typography;
@@ -2136,7 +1589,7 @@ app.post('/api/theme', (req, res) => {
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: req.body.typography ? 'TYPOGRAPHY_AND_THEME_SAVED' : 'THEME_CUSTOMIZATION_SAVED',
     resourceId: 'website_theme',
     reason: `Applied customized brand typography & theme settings (Base: ${currentTheme.typography?.baseFontSize || 1}rem)`
@@ -2146,16 +1599,11 @@ app.post('/api/theme', (req, res) => {
 });
 
 app.post('/api/theme/reset', (req, res) => {
-  const userRole = req.headers['x-user-role'];
-  if (userRole === 'participant') {
-    return res.status(403).json({ error: 'Unauthorized: Only system administrators may reset global typography and theme settings.' });
-  }
-
   currentTheme = { ...DEFAULT_THEME };
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'THEME_RESET_DEFAULT',
     resourceId: 'website_theme',
     reason: 'Restored default SLSU institutional brand palette & typography standards'
@@ -2219,7 +1667,7 @@ app.put('/api/activities/:id', (req, res) => {
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'ACTIVITY_UPDATED',
     resourceId: req.params.id,
     reason: `Updated details for activity "${activities[idx].title}"`
@@ -2237,7 +1685,7 @@ app.delete('/api/activities/:id', (req, res) => {
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'ACTIVITY_ARCHIVED',
     resourceId: req.params.id,
     reason: `Archived activity "${deleted.title}"`
@@ -2263,7 +1711,7 @@ app.post('/api/activities/:id/duplicate', (req, res) => {
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'ACTIVITY_DUPLICATED',
     resourceId: cloned.id,
     reason: `Duplicated activity template from "${orig.title}"`
@@ -2284,7 +1732,7 @@ app.put('/api/users/:id', (req, res) => {
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'USER_ROLE_STATUS_UPDATED',
     resourceId: req.params.id,
     reason: `Updated permissions/status for ${users[idx].name}`
@@ -2292,26 +1740,147 @@ app.put('/api/users/:id', (req, res) => {
   res.json(users[idx]);
 });
 
-app.post('/api/users/:id/reset', (req, res) => {
+app.post('/api/users/:id/reset', async (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   if (!user) {
     res.status(404).json({ error: 'User not found' });
     return;
   }
+
+  try {
+    const resetResponse = await fetch(`${supabaseUrl}/auth/v1/recover`, {
+      method: 'POST',
+      headers: { apikey: supabasePublishableKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: user.email })
+    });
+    if (!resetResponse.ok) {
+      const errorText = await resetResponse.text();
+      console.error(`Supabase password reset failed (${resetResponse.status}): ${errorText}`);
+      return res.status(502).json({ error: 'Supabase could not send the password reset email.' });
+    }
+  } catch (error) {
+    console.error('Supabase password reset request failed:', error);
+    return res.status(502).json({ error: 'The authentication service is unavailable.' });
+  }
+
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    adminName: 'Dr. Jane C. Monfort',
+    adminName: 'Administrator',
     action: 'USER_SECURITY_CREDENTIAL_RESET',
     resourceId: req.params.id,
     reason: `Issued temporary credential reset token for ${user.email}`
   });
-  res.json({ success: true, message: `Reset link dispatched to ${user.email}` });
+  res.json({ success: true, message: `Password reset email sent to ${user.email}` });
 });
 
+type PersistedServerState = {
+  users: ServerUser[];
+  systemSettings: typeof systemSettings;
+  activities: ServerActivity[];
+  evaluations: ServerEvaluation[];
+  auditLogs: AuditLog[];
+  evaluationForms: any[];
+  surveys: any[];
+  surveyResponses: any[];
+  currentTheme: typeof currentTheme;
+};
+
+function getServerState(): PersistedServerState {
+  return {
+    users: withPosition(users),
+    systemSettings,
+    activities: withPosition(activities),
+    evaluations: withPosition(evaluations),
+    auditLogs: withPosition(auditLogs),
+    evaluationForms: withPosition(evaluationForms),
+    surveys: withPosition(surveys),
+    surveyResponses: withPosition(surveyResponses),
+    currentTheme
+  };
+}
+
+function withPosition<T extends object>(records: T[]) {
+  return records.map((record, position) => ({ ...record, __position: position }));
+}
+
+function restoreArray<T>(target: T[], saved: unknown, name: string) {
+  if (!Array.isArray(saved)) {
+    throw new Error(`Supabase application state is missing the "${name}" array.`);
+  }
+  const records = saved.map(record => {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      throw new Error(`Supabase returned an invalid record in "${name}".`);
+    }
+    const { __position: _position, ...value } = record as Record<string, unknown>;
+    return value as T;
+  });
+  target.splice(0, target.length, ...records);
+}
+
+function restoreServerState(saved: unknown) {
+  if (!saved || typeof saved !== 'object') {
+    throw new Error('Supabase returned an invalid application state document.');
+  }
+
+  const state = saved as PersistedServerState;
+  restoreArray(users, state.users, 'users');
+  restoreArray(activities, state.activities, 'activities');
+  restoreArray(evaluations, state.evaluations, 'evaluations');
+  restoreArray(auditLogs, state.auditLogs, 'auditLogs');
+  restoreArray(evaluationForms, state.evaluationForms, 'evaluationForms');
+  restoreArray(surveys, state.surveys, 'surveys');
+  restoreArray(surveyResponses, state.surveyResponses, 'surveyResponses');
+
+  if (state.systemSettings && typeof state.systemSettings === 'object') systemSettings = state.systemSettings;
+  if (state.currentTheme && typeof state.currentTheme === 'object') currentTheme = state.currentTheme;
+}
+
+async function supabaseStateRequest(path: string, init?: RequestInit) {
+  if (!supabaseUrl || !supabaseSecretKey) {
+    throw new Error('Supabase service credentials are not configured.');
+  }
+
+  const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: supabaseSecretKey,
+      Authorization: `Bearer ${supabaseSecretKey}`,
+      ...(init?.headers || {})
+    }
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(`Supabase request failed (${response.status}): ${message}`);
+  }
+  return response;
+}
+
+async function saveServerState() {
+  await supabaseStateRequest('rpc/save_app_snapshot', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ p_snapshot: getServerState() })
+  });
+}
+
+async function hydrateServerState() {
+  const response = await supabaseStateRequest('rpc/load_app_snapshot', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}'
+  });
+  restoreServerState(await response.json());
+  await saveServerState();
+  console.log('Loaded application data from normalized Supabase tables.');
+}
 
 // Vite Middleware Integration for SPA Full-Stack Dev Server
 async function startServer() {
+  await hydrateServerState();
   const isProduction = process.env.NODE_ENV === 'production';
 
   if (!isProduction) {

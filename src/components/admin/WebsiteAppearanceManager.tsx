@@ -354,7 +354,7 @@ const SAMPLE_INSTITUTIONAL_LOGOS = [
 ];
 
 export const WebsiteAppearanceManager: React.FC = () => {
-  const { theme, updateTheme, resetTheme, addToast, role } = useApp();
+  const { theme, updateTheme, resetTheme, addToast, role, currentUser } = useApp();
 
   const [activeTab, setActiveTab] = useState<'sidebar' | 'typography' | 'colors'>('sidebar');
   const [logoSourceTab, setLogoSourceTab] = useState<'upload' | 'url' | 'preset'>('upload');
@@ -1839,7 +1839,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-xs font-bold text-slate-900 mt-0.5 truncate">
-                      Dr. Jane C. Monfort
+                      {currentUser.name}
                     </p>
                     <p className="text-[10px] text-slate-500 truncate">
                       Campus Quality Assurance Director

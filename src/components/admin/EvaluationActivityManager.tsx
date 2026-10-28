@@ -28,6 +28,7 @@ import {
 
 export const EvaluationActivityManager: React.FC = () => {
   const { 
+    currentUser,
     activities, 
     evaluations, 
     forms, 
@@ -62,10 +63,10 @@ export const EvaluationActivityManager: React.FC = () => {
   const [formVenue, setFormVenue] = useState('SLSU-Hinunangan Campus');
   const [formBeneficiaries, setFormBeneficiaries] = useState('Community Members & Trainees');
   const [formDepartment, setFormDepartment] = useState('Faculty of Computer Studies and Information Technology (FCSIT)');
-  const [formCoordinator, setFormCoordinator] = useState('Dr. Jane C. Monfort');
+  const [formCoordinator, setFormCoordinator] = useState(currentUser.name);
   const [formSpeaker, setFormSpeaker] = useState('Faculty Extension Team');
   const [formTargetCount, setFormTargetCount] = useState(40);
-  const [formAssignedRubric, setFormAssignedRubric] = useState<string>('form-001');
+  const [formAssignedRubric, setFormAssignedRubric] = useState<string>('');
 
   // Activity Details Modal
   const [detailActivity, setDetailActivity] = useState<Activity | null>(null);
@@ -96,10 +97,10 @@ export const EvaluationActivityManager: React.FC = () => {
     setFormVenue('SLSU-Hinunangan Campus');
     setFormBeneficiaries('Community Members & Trainees');
     setFormDepartment('Faculty of Computer Studies and Information Technology (FCSIT)');
-    setFormCoordinator('Dr. Jane C. Monfort');
+    setFormCoordinator(currentUser.name);
     setFormSpeaker('Faculty Extension Team');
     setFormTargetCount(40);
-    setFormAssignedRubric(forms[0]?.id || 'form-001');
+    setFormAssignedRubric(forms[0]?.id || '');
     setShowModal(true);
   };
 
@@ -118,7 +119,7 @@ export const EvaluationActivityManager: React.FC = () => {
     setFormCoordinator(act.leadCoordinator || '');
     setFormSpeaker(act.trainerOrSpeaker || '');
     setFormTargetCount(act.totalTargetParticipants || 30);
-    setFormAssignedRubric(act.assignedFormId || (forms[0]?.id || 'form-001'));
+    setFormAssignedRubric(act.assignedFormId || (forms[0]?.id || ''));
     setShowModal(true);
   };
 

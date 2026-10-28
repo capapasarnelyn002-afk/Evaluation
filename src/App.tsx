@@ -14,6 +14,8 @@ import { Building2, ShieldCheck, Award } from 'lucide-react';
 const MainLayout: React.FC = () => {
   const { 
     role, 
+    isAuthenticated,
+    isAuthLoading,
     sidebarCollapsed,
     lastSubmittedEvaluation, 
     setLastSubmittedEvaluation, 
@@ -21,6 +23,18 @@ const MainLayout: React.FC = () => {
     toasts,
     dismissToast
   } = useApp();
+
+  if (isAuthLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        {isAuthLoading ? (
+          <p className="text-sm text-slate-600">Checking sign-in session...</p>
+        ) : (
+          <LoginModal />
+        )}
+      </div>
+    );
+  }
 
   const currentActivityForReceipt = lastSubmittedEvaluation
     ? activities.find(a => a.id === lastSubmittedEvaluation.activityId) || activities[0]
@@ -95,9 +109,6 @@ const MainLayout: React.FC = () => {
           onClose={() => setLastSubmittedEvaluation(null)}
         />
       )}
-
-      {/* Authentication & Role Switcher Modal */}
-      <LoginModal />
 
       {/* Offline Synchronization Modal */}
       <OfflineSyncModal />

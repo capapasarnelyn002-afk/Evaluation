@@ -105,7 +105,9 @@ export const ParticipantEvaluationView: React.FC = () => {
   } = useApp();
 
   const currentActivity = activities.find(a => a.id === selectedActivityId) || activities[0];
-  const assignedForm = forms.find(form => form.id === currentActivity.assignedFormId && form.status === 'published');
+  const assignedForm = currentActivity
+    ? forms.find(form => form.id === currentActivity.assignedFormId && form.status === 'published')
+    : undefined;
 
   // Participant demographic fields
   const [participantName, setParticipantName] = useState('');
@@ -119,7 +121,7 @@ export const ParticipantEvaluationView: React.FC = () => {
 
   useEffect(() => {
     setCustomAnswers({});
-  }, [currentActivity.id, assignedForm?.id]);
+  }, [currentActivity?.id, assignedForm?.id]);
 
   // Ratings
   const [coreRatings, setCoreRatings] = useState<Record<string, number>>({
@@ -131,7 +133,7 @@ export const ParticipantEvaluationView: React.FC = () => {
     organization: 5
   });
 
-  const specificQuestions = ACTIVITY_SPECIFIC_QUESTIONS[currentActivity.activityType] || [];
+  const specificQuestions = currentActivity ? ACTIVITY_SPECIFIC_QUESTIONS[currentActivity.activityType] || [] : [];
   const [specificRatings, setSpecificRatings] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {};
     specificQuestions.forEach(q => { init[q.id] = 5; });
@@ -150,8 +152,10 @@ export const ParticipantEvaluationView: React.FC = () => {
 
   // Duplicate Check
   const isAlreadyEvaluated = !!participantEmail && (
-    evaluations.some(e => e.activityId === currentActivity.id && e.participantEmail.toLowerCase() === participantEmail.toLowerCase()) ||
-    offlineQueue.some(e => e.activityId === currentActivity.id && e.participantEmail.toLowerCase() === participantEmail.toLowerCase())
+    currentActivity && (
+      evaluations.some(e => e.activityId === currentActivity.id && e.participantEmail.toLowerCase() === participantEmail.toLowerCase()) ||
+      offlineQueue.some(e => e.activityId === currentActivity.id && e.participantEmail.toLowerCase() === participantEmail.toLowerCase())
+    )
   );
 
   const handleCoreRatingChange = (qid: string, val: number) => {
@@ -166,6 +170,11 @@ export const ParticipantEvaluationView: React.FC = () => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessInfo(null);
+
+    if (!currentActivity) {
+      setErrorMessage('There are no activities available for evaluation.');
+      return;
+    }
 
     if (!participantName.trim() || !participantEmail.trim()) {
       setErrorMessage('Please provide both your Full Name and a valid Email Address.');
@@ -210,6 +219,15 @@ export const ParticipantEvaluationView: React.FC = () => {
       },
       consentAccepted: true
     };
+
+    if (!currentActivity) {
+      return (
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
+          <h2 className="font-bold text-slate-900">No activities available</h2>
+          <p className="mt-2 text-sm text-slate-600">An administrator must add an activity before you can submit an evaluation.</p>
+        </div>
+      );
+    }
 
     const result = await submitEvaluation(submissionPayload);
     setIsSubmitting(false);

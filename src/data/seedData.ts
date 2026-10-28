@@ -1,4 +1,4 @@
-import { Activity, ActivityType, QuestionDefinition } from '../types';
+import { ActivityType, QuestionDefinition } from '../types';
 
 export const CORE_QUESTIONS: QuestionDefinition[] = [
   {
@@ -141,89 +141,6 @@ export const ACTIVITY_SPECIFIC_QUESTIONS: Record<ActivityType, QuestionDefinitio
     }
   ]
 };
-
-export const INITIAL_ACTIVITIES: Activity[] = [
-  {
-    id: 'act-2026-001',
-    title: 'Digital Literacy & E-Commerce Training for Rural Agri-Entrepreneurs',
-    activityType: 'training',
-    description: 'Empowering local farmers and MSME food processors in Hinunangan to market native coconut products and rice varieties online through social commerce and e-wallets.',
-    date: '2026-03-12',
-    venue: 'SLSU-Hinunangan ICT Laboratory & Audio-Visual Hall',
-    targetBeneficiaries: 'Local Farmers, Fisherfolk Cooperatives, Rural MSMEs',
-    organizingDepartment: 'Faculty of Computer Studies and Information Technology (FCSIT)',
-    leadCoordinator: 'Engr. Sheryl Ann C. Barrot, MIT',
-    trainerOrSpeaker: 'Prof. Arnelyn T. Capapas & IT Extension Team',
-    status: 'completed',
-    totalTargetParticipants: 45,
-    evaluatedParticipants: 2,
-    averageRating: 4.56
-  },
-  {
-    id: 'act-2026-002',
-    title: 'Sustainable Seaweed & Mud Crab Livelihood Culture Demonstration',
-    activityType: 'livelihood',
-    description: 'Hands-on livelihood module providing coastal households in Hinunangan Bay with mud crab fattening pens and resilient seaweed seed stocks.',
-    date: '2026-03-24',
-    venue: 'Barangay Ingan Coastal Community Center, Hinunangan',
-    targetBeneficiaries: 'Coastal Fisherfolk Families & Women Producers',
-    organizingDepartment: 'Office of Extension and Community Services',
-    leadCoordinator: 'Rencilyn P. Tabugon',
-    trainerOrSpeaker: 'Aquaculture Specialist Dina Mae M. Tibar',
-    status: 'completed',
-    totalTargetParticipants: 35,
-    evaluatedParticipants: 2,
-    averageRating: 4.34
-  },
-  {
-    id: 'act-2026-003',
-    title: 'Seminar on Climate Resilience & Disaster Risk Preparedness for Barangays',
-    activityType: 'seminar',
-    description: 'Community symposium addressing coastal storm surge preparedness, rainwater harvesting, and solar early-warning communication tools.',
-    date: '2026-04-05',
-    venue: 'Hinunangan Municipal Gymnasium',
-    targetBeneficiaries: 'Barangay Disaster Risk Reduction Councils & Youth Leaders',
-    organizingDepartment: 'FCSIT Extension Division & SLSU DRRM Unit',
-    leadCoordinator: 'Prof. Arnelyn T. Capapas',
-    trainerOrSpeaker: 'PDRRMO Specialist & Environmental Science Faculty',
-    status: 'completed',
-    totalTargetParticipants: 60,
-    evaluatedParticipants: 1,
-    averageRating: 5.0
-  },
-  {
-    id: 'act-2026-004',
-    title: 'Community Health Outreach & Computerized Medical Records Assistance',
-    activityType: 'outreach',
-    description: 'Interdisciplinary medical mission and digital health profiling for senior citizens and indigent households in upland Hinunangan.',
-    date: '2026-04-18',
-    venue: 'Barangay Banghud Health Outpost, Hinunangan',
-    targetBeneficiaries: 'Upland Residents, Senior Citizens, Barangay Health Workers',
-    organizingDepartment: 'College of Allied Health & FCSIT Extension Unit',
-    leadCoordinator: 'Dina Mae M. Tibar',
-    trainerOrSpeaker: 'University Physician & IT Volunteer Corps',
-    status: 'completed',
-    totalTargetParticipants: 80,
-    evaluatedParticipants: 1,
-    averageRating: 4.67
-  },
-  {
-    id: 'act-2026-005',
-    title: 'Community Service: Mangrove Reforestation & Coastal Cleanup Drive',
-    activityType: 'community_service',
-    description: 'Youth-led ecological restoration and mangrove propagule planting along Hinunangan Marine Protected Sanctuary.',
-    date: '2026-05-02',
-    venue: 'Hinunangan Mangrove Marine Protected Sanctuary',
-    targetBeneficiaries: 'Coastal Communities, Sangguniang Kabataan, Local Fisherfolk',
-    organizingDepartment: 'SLSU Supreme Student Council & Extension Services',
-    leadCoordinator: 'Rencilyn P. Tabugon',
-    trainerOrSpeaker: 'CENRO Officer & Marine Biology Specialists',
-    status: 'active',
-    totalTargetParticipants: 50,
-    evaluatedParticipants: 0,
-    averageRating: 0
-  }
-];
 
 export const TOPIC_LABELS: Record<string, { label: string; color: string; icon: string }> = {
   facilities: { label: 'Facilities & Internet/Venue', color: 'bg-amber-100 text-amber-800 border-amber-300', icon: 'Building' },
