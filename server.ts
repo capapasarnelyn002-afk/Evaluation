@@ -149,6 +149,25 @@ export interface ServerUser {
 
 const users: ServerUser[] = [];
 
+const DEMO_ACCOUNT_EMAIL = 'admin@example.com';
+const DEMO_ACCOUNT_ID = 'demo-admin';
+
+function ensureDefaultDemoAccount() {
+  if (users.some((user) => user.email.toLowerCase() === DEMO_ACCOUNT_EMAIL)) return;
+  if (users.length > 0) return;
+
+  users.push({
+    id: DEMO_ACCOUNT_ID,
+    name: 'Demo Administrator',
+    email: DEMO_ACCOUNT_EMAIL,
+    role: 'admin',
+    department: 'Demo',
+    title: 'Demo Administrator',
+    status: 'active',
+    lastLogin: new Date().toISOString()
+  });
+}
+
 let systemSettings = {
   institutionName: 'Southern Leyte State University - Hinunangan Campus',
   campusCode: 'SLSU-HIN',
@@ -1834,6 +1853,8 @@ function restoreServerState(saved: unknown) {
 
   if (state.systemSettings && typeof state.systemSettings === 'object') systemSettings = state.systemSettings;
   if (state.currentTheme && typeof state.currentTheme === 'object') currentTheme = state.currentTheme;
+
+  ensureDefaultDemoAccount();
 }
 
 async function supabaseStateRequest(path: string, init?: RequestInit) {
