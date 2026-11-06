@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { app, initializeServer } from '../server';
+import { app, initializeServer } from '../server.js';
 
 function sendJson(response: Response, statusCode: number, body: object) {
   response.statusCode = statusCode;
