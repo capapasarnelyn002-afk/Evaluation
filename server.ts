@@ -205,7 +205,7 @@ async function getAuthenticatedAccount(accessToken: string): Promise<ServerUser 
 }
 
 app.use('/api', async (req, res, next) => {
-  if (['/auth/login', '/auth/me', '/auth/logout'].includes(req.path)) return next();
+  if (['/auth/login', '/auth/me', '/auth/logout', '/database/status'].includes(req.path)) return next();
 
   const accessToken = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!accessToken) return res.status(401).json({ error: 'A valid sign-in session is required.' });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Building2, KeyRound, Lock } from 'lucide-react';
+import { DatabaseStatusIndicator } from './DatabaseStatusIndicator';
 
 export const LoginModal: React.FC = () => {
   const { loginWithEmail } = useApp();
@@ -87,6 +88,9 @@ export const LoginModal: React.FC = () => {
           </button>
           </form>
         </section>
+        <div className="mt-4 flex justify-center">
+          <DatabaseStatusIndicator />
+        </div>
         <p className="mt-6 text-center text-xs text-slate-500">Authorized users only · Your session is securely verified.</p>
       </div>
     </main>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   Menu, 
@@ -6,16 +6,11 @@ import {
   WifiOff, 
   RefreshCw, 
   Award, 
-  ChevronRight,
-  CheckCircle2,
-  Database,
-  LoaderCircle,
-  XCircle
+  ChevronRight
 } from 'lucide-react';
-import { apiFetch } from '../utils/api';
+import { DatabaseStatusIndicator } from './DatabaseStatusIndicator';
 
 export const TopBar: React.FC = () => {
-  const [databaseStatus, setDatabaseStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const { 
     currentUser, 
     role, 
@@ -28,27 +23,6 @@ export const TopBar: React.FC = () => {
     setShowAboutModal,
     theme
   } = useApp();
-
-  useEffect(() => {
-    let active = true;
-
-    const checkDatabaseStatus = async () => {
-      try {
-        const response = await apiFetch('/api/database/status');
-        if (active) setDatabaseStatus(response.ok ? 'connected' : 'disconnected');
-      } catch {
-        if (active) setDatabaseStatus('disconnected');
-      }
-    };
-
-    void checkDatabaseStatus();
-    const intervalId = window.setInterval(() => void checkDatabaseStatus(), 30_000);
-
-    return () => {
-      active = false;
-      window.clearInterval(intervalId);
-    };
-  }, []);
 
   const getViewTitle = () => {
     switch (currentView) {
@@ -136,41 +110,7 @@ export const TopBar: React.FC = () => {
 
         {/* Right action controls: network mode and offline sync */}
         <div className="flex items-center gap-2 shrink-0">
-
-          <div
-            role="status"
-            aria-live="polite"
-            title={
-              databaseStatus === 'connected'
-                ? 'Connected to the Supabase database'
-                : databaseStatus === 'disconnected'
-                  ? 'Unable to reach the Supabase database'
-                  : 'Checking the Supabase database connection'
-            }
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold ${
-              databaseStatus === 'connected'
-                ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                : databaseStatus === 'disconnected'
-                  ? 'bg-rose-50 text-rose-900 border-rose-300'
-                  : 'bg-slate-50 text-slate-600 border-slate-300'
-            }`}
-          >
-            {databaseStatus === 'connected' ? (
-              <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-            ) : databaseStatus === 'disconnected' ? (
-              <XCircle className="w-3.5 h-3.5" aria-hidden="true" />
-            ) : (
-              <LoaderCircle className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
-            )}
-            <Database className="w-3.5 h-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">
-              {databaseStatus === 'connected'
-                ? 'Database connected'
-                : databaseStatus === 'disconnected'
-                  ? 'Database unavailable'
-                  : 'Checking database'}
-            </span>
-          </div>
+          <DatabaseStatusIndicator />
           
           {/* Offline/Online Network Indicator Button */}
           <button
