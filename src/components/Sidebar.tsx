@@ -297,7 +297,7 @@ export const Sidebar: React.FC = () => {
           title="Capstone Defense Information (May 2026)"
         >
           <HelpCircle className="w-4 h-4 text-slate-400 shrink-0" />
-          {!sidebarCollapsed && <span>SLSU Capstone 2026</span>}
+          {!sidebarCollapsed && <span>Developer Info</span>}
         </button>
 
         {/* Logout button */}
