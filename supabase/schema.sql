@@ -160,6 +160,14 @@ begin
     return new;
   end if;
 
+  -- Google sign-ins may bind only to an existing application account.
+  if new.raw_app_meta_data->>'provider' = 'google' then
+    update public.users
+    set id = new.id::text
+    where lower(email) = lower(new.email);
+    return new;
+  end if;
+
   insert into public.users (id, name, email, role, department, title, status)
   values (
     new.id::text,

@@ -16,6 +16,7 @@ import {
 } from '../types';
 import { ToastMessage } from '../components/ui/Toast';
 import { apiFetch } from '../utils/api';
+import { supabase } from '../utils/supabase';
 
 export interface SystemSettings {
   institutionName: string;
@@ -92,8 +93,11 @@ interface AppContextType {
   role: UserRole;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
+  loginError: string;
+  clearLoginError: () => void;
   users: UserAccount[];
   loginWithEmail: (email: string, password: string) => Promise<boolean>;
+  loginWithGoogle: () => Promise<string | null>;
   logout: () => Promise<void>;
   updateUserRole: (userId: string, newRole: UserRole, status?: 'active' | 'inactive') => Promise<void>;
   createUserAccount: (accountData: Partial<UserAccount>) => Promise<UserAccount | null>;
@@ -189,6 +193,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [loginError, setLoginError] = useState('');
 
   const role = currentUser.role;
 
@@ -308,6 +313,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loginWithEmail = async (email: string, password: string): Promise<boolean> => {
+    setLoginError('');
     try {
       const res = await apiFetch('/api/auth/login', {
         method: 'POST',
@@ -341,9 +347,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const loginWithGoogle = async (): Promise<string | null> => {
+    setLoginError('');
+    if (!supabase) {
+      const message = 'Google sign-in is not configured. Set the public Supabase URL and publishable key.';
+      setLoginError(message);
+      return message;
+    }
+
+    localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
+    sessionStorage.setItem('slsu_google_oauth_pending', 'true');
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+          queryParams: { prompt: 'select_account' }
+        }
+      });
+      if (!error) return null;
+      sessionStorage.removeItem('slsu_google_oauth_pending');
+      setLoginError(error.message);
+      return error.message;
+    } catch (error) {
+      sessionStorage.removeItem('slsu_google_oauth_pending');
+      const message = error instanceof Error ? error.message : 'Could not start Google sign-in.';
+      setLoginError(message);
+      return message;
+    }
+  };
+
   const logout = async () => {
     const token = localStorage.getItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
-    if (token) {
+    let hasOAuthSession = false;
+    if (supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        hasOAuthSession = Boolean(session);
+        if (session) {
+          const { error } = await supabase.auth.signOut();
+          if (error) addToast({ type: 'error', title: 'Sign Out Failed', description: error.message });
+        }
+      } catch {
+        addToast({ type: 'error', title: 'Sign Out Failed', description: 'Could not clear the Google sign-in session.' });
+      }
+    }
+    if (token && !hasOAuthSession) {
       try {
         await apiFetch('/api/auth/logout', {
           method: 'POST',
@@ -746,6 +795,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (savedQueue) {
       try { setOfflineQueue(JSON.parse(savedQueue)); } catch {}
     }
+    if (sessionStorage.getItem('slsu_google_oauth_pending') === 'true') return;
     const token = localStorage.getItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
     if (token) {
       apiFetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
@@ -765,6 +815,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       setIsAuthLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.access_token) {
+        localStorage.setItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY, session.access_token);
+      } else if (event === 'SIGNED_OUT') {
+        localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const authClient = supabase;
+    if (!authClient || sessionStorage.getItem('slsu_google_oauth_pending') !== 'true') return;
+    sessionStorage.removeItem('slsu_google_oauth_pending');
+    let active = true;
+
+    const finishGoogleSignIn = async () => {
+      try {
+        const { data: { session }, error } = await authClient.auth.getSession();
+        if (error) throw error;
+        if (!session) throw new Error('Google did not return a valid sign-in session. Please try again.');
+
+        localStorage.setItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY, session.access_token);
+        const authorizationHeaders = new Headers();
+        authorizationHeaders.set('Authorization', ['Bearer', session.access_token].join(' '));
+        const response = await apiFetch('/api/auth/me', { headers: authorizationHeaders });
+        const result = await response.json() as { user?: UserAccount; error?: string };
+        if (!response.ok || !result.user) {
+          localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
+          await authClient.auth.signOut();
+          throw new Error(result.error || 'This Google account is not authorized for the application.');
+        }
+
+        if (!active) return;
+        setCurrentUser(result.user);
+        setIsAuthenticated(true);
+        setCurrentView('overview');
+        setLoginError('');
+      } catch (error) {
+        localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
+        if (active) {
+          setLoginError(error instanceof Error ? error.message : 'Google sign-in failed. Please try again.');
+        }
+      } finally {
+        if (active) setIsAuthLoading(false);
+      }
+    };
+
+    void finishGoogleSignIn();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -1001,8 +1107,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         role,
         isAuthenticated,
         isAuthLoading,
+        loginError,
+        clearLoginError: () => setLoginError(''),
         users,
         loginWithEmail,
+        loginWithGoogle,
         logout,
         updateUserRole,
         createUserAccount,
