@@ -838,7 +838,20 @@ app.post('/api/auth/login', async (req, res) => {
         console.error(`Supabase sign-in service returned HTTP ${authResponse.status}.`);
         return res.status(502).json({ error: 'The authentication service is unavailable. Check the Supabase server configuration.' });
       }
-      return res.status(401).json({ error: 'Invalid email or password.' });
+      if (authResponse.status === 400 || authResponse.status === 401) {
+        if (/email not confirmed|email_not_confirmed/i.test(errorBody)) {
+          return res.status(401).json({ error: 'Please confirm your email before signing in.' });
+        }
+
+        const profileResponse = await supabaseStateRequest(
+          `users?select=id&email=eq.${encodeURIComponent(email.trim().toLowerCase())}&limit=1`
+        );
+        const profiles = await profileResponse.json() as Array<{ id: string }>;
+        return res.status(401).json({
+          error: profiles.length ? 'Wrong password.' : 'User does not exist.'
+        });
+      }
+      return res.status(401).json({ error: 'Could not sign in. Please check your credentials and try again.' });
     }
 
     const authData = await authResponse.json() as { access_token?: string; user?: { id?: string } };

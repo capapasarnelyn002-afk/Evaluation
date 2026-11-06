@@ -334,15 +334,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return true;
       } else {
         const err = await res.json();
+        setLoginError(err.error || 'Invalid email or password.');
         addToast({
           type: 'error',
           title: 'Sign In Failed',
-          description: err.error || 'Invalid credentials'
+          description: err.error || 'Invalid email or password.'
         });
         return false;
       }
     } catch {
-      addToast({ type: 'error', title: 'Sign In Failed', description: 'The authentication service is unavailable.' });
+      const message = 'The authentication service is unavailable.';
+      setLoginError(message);
+      addToast({ type: 'error', title: 'Sign In Failed', description: message });
       return false;
     }
   };
