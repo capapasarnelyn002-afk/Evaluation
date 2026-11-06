@@ -3,10 +3,11 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { randomUUID } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 
 dotenv.config({ path: ['.env.local', '.env'] });
 
-const app = express();
+export const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '10mb' }));
@@ -905,7 +906,15 @@ app.get('/api/database/status', async (_req, res) => {
     return res.json({ connected: true });
   } catch (error) {
     console.error('Supabase database status check failed:', error);
-    return res.status(503).json({ connected: false });
+    const message = error instanceof Error ? error.message : '';
+    const hint = message.includes('credentials are not configured')
+      ? 'Configure SUPABASE_URL and SUPABASE_SECRET_KEY in the deployment environment.'
+      : message.includes('(401)') || message.includes('(403)')
+        ? 'Supabase rejected the server key. Check SUPABASE_SECRET_KEY in the deployment environment.'
+        : message.includes('(404)')
+          ? 'The Supabase users table was not found. Run supabase/schema.sql in the Supabase SQL Editor.'
+          : 'Check the Supabase project URL, server key, and database availability.';
+    return res.status(503).json({ connected: false, hint });
   }
 });
 
@@ -960,7 +969,7 @@ app.post('/api/users', async (req, res) => {
       method: 'POST',
       headers: {
         apikey: supabaseSecretKey,
-        Authorization: `Bearer ${supabaseSecretKey}`,
+        ...(supabaseSecretKey.startsWith('sb_secret_') ? {} : { Authorization: `Bearer ${supabaseSecretKey}` }),
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ email: normalizedEmail, data: { name: name.trim() } })
@@ -1909,9 +1918,16 @@ async function hydrateServerState() {
   console.log('Loaded application data from normalized Supabase tables.');
 }
 
+let initializationPromise: Promise<void> | undefined;
+
+export function initializeServer() {
+  initializationPromise ??= hydrateServerState();
+  return initializationPromise;
+}
+
 // Vite Middleware Integration for SPA Full-Stack Dev Server
 async function startServer() {
-  await hydrateServerState();
+  await initializeServer();
   const isProduction = process.env.NODE_ENV === 'production';
 
   if (!isProduction) {
@@ -1933,7 +1949,9 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  });
+}

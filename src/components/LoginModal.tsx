@@ -89,7 +89,7 @@ export const LoginModal: React.FC = () => {
           </form>
         </section>
         <div className="mt-4 flex justify-center">
-          <DatabaseStatusIndicator />
+          <DatabaseStatusIndicator showHint />
         </div>
         <p className="mt-6 text-center text-xs text-slate-500">Authorized users only · Your session is securely verified.</p>
       </div>
