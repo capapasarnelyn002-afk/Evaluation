@@ -21,6 +21,7 @@ app.use((req, res, next) => {
   const isStateMutation =
     req.path.startsWith('/api/') &&
     !req.path.startsWith('/api/ai/') &&
+    !req.path.startsWith('/api/auth/') &&
     ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
 
   if (isStateMutation) {
