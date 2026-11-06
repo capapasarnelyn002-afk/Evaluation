@@ -899,6 +899,16 @@ app.post('/api/auth/logout', async (req, res) => {
   return res.json({ success: true });
 });
 
+app.get('/api/database/status', async (_req, res) => {
+  try {
+    await supabaseStateRequest('users?select=id&limit=1');
+    return res.json({ connected: true });
+  } catch (error) {
+    console.error('Supabase database status check failed:', error);
+    return res.status(503).json({ connected: false });
+  }
+});
+
 // ==========================================
 // USER ACCOUNTS & RBAC MANAGEMENT
 // ==========================================
