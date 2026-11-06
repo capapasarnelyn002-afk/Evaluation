@@ -66,12 +66,13 @@ export const ParticipantDashboardView: React.FC = () => {
 
     setIsSubmittingSurvey(true);
     try {
-      await submitSurveyResponse(
+      const submitted = await submitSurveyResponse(
         activeSurvey.id,
         surveyAnswers,
         activeSurvey.isAnonymous ? undefined : respondentName,
         activeSurvey.isAnonymous ? undefined : respondentEmail
       );
+      if (!submitted) return;
       addToast({
         type: 'success',
         title: 'Survey Submitted',

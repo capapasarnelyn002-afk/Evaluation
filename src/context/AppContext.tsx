@@ -139,8 +139,8 @@ interface AppContextType {
 
   // Domain Data: Website Theme Customization
   theme: WebsiteTheme;
-  updateTheme: (newTheme: Partial<WebsiteTheme>, showToast?: boolean) => Promise<void>;
-  resetTheme: () => Promise<void>;
+  updateTheme: (newTheme: Partial<WebsiteTheme>, showToast?: boolean) => Promise<boolean>;
+  resetTheme: () => Promise<boolean>;
 
   // Domain Data: Evaluations & Sync
   evaluations: EvaluationSubmission[];
@@ -151,7 +151,7 @@ interface AppContextType {
   maskPII: boolean;
   setMaskPII: (mask: boolean) => void;
   systemSettings: SystemSettings;
-  updateSystemSettings: (settings: Partial<SystemSettings>) => Promise<void>;
+  updateSystemSettings: (settings: Partial<SystemSettings>) => Promise<boolean>;
   systemMetrics: SystemMetrics | null;
   refreshMetrics: () => Promise<void>;
   refreshAllData: () => Promise<void>;
@@ -166,7 +166,7 @@ interface AppContextType {
   submitEvaluation: (evaluationData: Partial<EvaluationSubmission>) => Promise<{ success: boolean; evaluation?: EvaluationSubmission; error?: string }>;
   syncOfflineQueue: () => Promise<{ success: boolean; count: number; error?: string }>;
   logAuditAction: (action: string, resourceId: string, reason: string, controlNumber?: string) => Promise<void>;
-  updateFollowUpStatus: (evalId: string, status: 'none' | 'pending' | 'in_progress' | 'resolved', notes: string) => Promise<void>;
+  updateFollowUpStatus: (evalId: string, status: 'none' | 'pending' | 'in_progress' | 'resolved', notes: string) => Promise<boolean>;
   
   // UI Modal states
   showAboutModal: boolean;
@@ -182,6 +182,11 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_QUEUE_KEY = 'slsu_ext_offline_queue_v1';
 const LOCAL_STORAGE_ACCESS_TOKEN_KEY = 'slsu_ext_access_token_v1';
+
+async function getApiError(response: Response, fallback: string): Promise<string> {
+  const body = await response.json().catch(() => null) as { error?: unknown } | null;
+  return typeof body?.error === 'string' ? body.error : fallback;
+}
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<UserAccount>({
@@ -435,9 +440,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           title: 'User Updated',
           description: `${updated.name} updated successfully.`
         });
+      } else {
+        addToast({ type: 'error', title: 'User Update Failed', description: await getApiError(res, 'Could not update this account.') });
       }
-    } catch {
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole, status } : u));
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'User Update Failed',
+        description: error instanceof Error ? error.message : 'Could not update this account.'
+      });
     }
   };
 
@@ -448,42 +459,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(accountData)
       });
-      if (res.ok) {
-        const created = await res.json();
-        setUsers(prev => [...prev, created]);
-        addToast({
-          type: 'success',
-          title: 'Account Created',
-          description: `${created.name} (${created.role})`
-        });
-        return created;
-      }
-    } catch {}
-    return null;
+      if (!res.ok) throw new Error(await getApiError(res, 'Could not create this account.'));
+
+      const created = await res.json();
+      setUsers(prev => [...prev, created]);
+      addToast({
+        type: 'success',
+        title: 'Account Created',
+        description: `${created.name} (${created.role})`
+      });
+      return created;
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Account Creation Failed',
+        description: error instanceof Error ? error.message : 'Could not create this account.'
+      });
+      return null;
+    }
   };
 
   const deleteUserAccount = async (userId: string): Promise<boolean> => {
     try {
       const res = await apiFetch(`/api/users/${userId}`, { method: 'DELETE' });
-      if (res.ok) {
-        setUsers(prev => prev.filter(u => u.id !== userId));
-        addToast({ type: 'info', title: 'User Removed', description: 'Account deleted.' });
-        return true;
-      }
-    } catch {}
-    setUsers(prev => prev.filter(u => u.id !== userId));
-    return true;
+      if (!res.ok) throw new Error(await getApiError(res, 'Could not delete this account.'));
+
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      addToast({ type: 'info', title: 'User Removed', description: 'Account deleted.' });
+      return true;
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Account Deletion Failed',
+        description: error instanceof Error ? error.message : 'Could not delete this account.'
+      });
+      return false;
+    }
   };
 
   const resetUserPassword = async (userId: string): Promise<boolean> => {
     try {
       const res = await apiFetch(`/api/users/${userId}/reset`, { method: 'POST' });
-      if (res.ok) {
-        addToast({ type: 'success', title: 'Reset Link Dispatched', description: 'Temporary credential reset token issued.' });
-        return true;
-      }
-    } catch {}
-    return false;
+      if (!res.ok) throw new Error(await getApiError(res, 'Could not start the password reset.'));
+      addToast({ type: 'success', title: 'Reset Link Dispatched', description: 'Temporary credential reset token issued.' });
+      return true;
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Password Reset Failed',
+        description: error instanceof Error ? error.message : 'Could not start the password reset.'
+      });
+      return false;
+    }
   };
 
   // Activity management
@@ -493,8 +520,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(activityData)
     });
+    if (!res.ok) throw new Error(await getApiError(res, 'The activity could not be created.'));
+
     const created = await res.json();
     setActivities(prev => [created, ...prev]);
+    addToast({ type: 'success', title: 'Activity Created', description: `Created "${created.title}".` });
     return created;
   };
 
@@ -517,6 +547,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(activityData)
     });
+    if (!res.ok) throw new Error(await getApiError(res, 'The activity could not be updated.'));
+
     const updated = await res.json();
     setActivities(prev => prev.map(a => a.id === id ? updated : a));
     addToast({ type: 'success', title: 'Activity Updated', description: `Saved changes to "${updated.title}".` });
@@ -524,17 +556,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteActivity = async (id: string): Promise<boolean> => {
-    const res = await apiFetch(`/api/activities/${id}`, { method: 'DELETE' });
-    if (res.ok) {
+    try {
+      const res = await apiFetch(`/api/activities/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await getApiError(res, 'The activity could not be deleted.'));
+
       setActivities(prev => prev.filter(a => a.id !== id));
       addToast({ type: 'info', title: 'Activity Archived', description: 'Activity moved to archives.' });
       return true;
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Activity Delete Failed',
+        description: error instanceof Error ? error.message : 'The activity could not be deleted.'
+      });
+      return false;
     }
-    return false;
   };
 
   const duplicateActivity = async (id: string): Promise<Activity> => {
     const res = await apiFetch(`/api/activities/${id}/duplicate`, { method: 'POST' });
+    if (!res.ok) throw new Error(await getApiError(res, 'The activity could not be duplicated.'));
     const cloned = await res.json();
     setActivities(prev => [cloned, ...prev]);
     addToast({ type: 'success', title: 'Activity Duplicated', description: `Created cohort clone "${cloned.title}".` });
@@ -588,13 +629,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteForm = async (id: string): Promise<boolean> => {
-    const res = await apiFetch(`/api/forms/${id}`, { method: 'DELETE' });
-    if (res.ok) {
+    try {
+      const res = await apiFetch(`/api/forms/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await getApiError(res, 'The evaluation form could not be deleted.'));
+
       setForms(prev => prev.filter(f => f.id !== id));
       addToast({ type: 'info', title: 'Form Deleted', description: 'Evaluation form removed.' });
       return true;
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Form Delete Failed',
+        description: error instanceof Error ? error.message : 'The evaluation form could not be deleted.'
+      });
+      return false;
     }
-    return false;
   };
 
   const duplicateForm = async (id: string): Promise<EvaluationForm> => {
@@ -613,7 +662,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(surveyData)
     });
-    const created = await res.json();
+    const created = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(created.error || 'The survey could not be created.');
     setSurveys(prev => [created, ...prev]);
     addToast({ type: 'success', title: 'Survey Created', description: `Stakeholder survey "${created.title}" registered.` });
     return created;
@@ -625,20 +675,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(surveyData)
     });
-    const updated = await res.json();
+    const updated = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(updated.error || 'The survey could not be updated.');
     setSurveys(prev => prev.map(s => s.id === id ? updated : s));
     addToast({ type: 'success', title: 'Survey Updated', description: `Saved changes to "${updated.title}".` });
     return updated;
   };
 
   const deleteSurvey = async (id: string): Promise<boolean> => {
-    const res = await apiFetch(`/api/surveys/${id}`, { method: 'DELETE' });
-    if (res.ok) {
+    try {
+      const res = await apiFetch(`/api/surveys/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await getApiError(res, 'The survey could not be deleted.'));
+
       setSurveys(prev => prev.filter(s => s.id !== id));
       addToast({ type: 'info', title: 'Survey Archived', description: 'Survey removed from active list.' });
       return true;
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Survey Delete Failed',
+        description: error instanceof Error ? error.message : 'The survey could not be deleted.'
+      });
+      return false;
     }
-    return false;
   };
 
   const submitSurveyResponse = async (surveyId: string, answers: Record<string, any>, name?: string, email?: string): Promise<boolean> => {
@@ -652,11 +711,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       refreshMetrics();
       return true;
     }
+    addToast({ type: 'error', title: 'Survey Not Submitted', description: await getApiError(res, 'Your survey response could not be submitted.') });
     return false;
   };
 
   // Website Theme Customization
-  const updateTheme = async (newTheme: Partial<WebsiteTheme>, showToast = false) => {
+  const updateTheme = async (newTheme: Partial<WebsiteTheme>, showToast = false): Promise<boolean> => {
     try {
       const merged = { ...theme, ...newTheme };
       const res = await apiFetch('/api/theme', {
@@ -679,6 +739,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           description: 'The saved appearance is now applied across the website.'
         });
       }
+      return true;
     } catch (error) {
       console.error('Failed to save website appearance:', error);
       addToast({
@@ -686,43 +747,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         title: 'Appearance Not Saved',
         description: error instanceof Error ? error.message : 'The appearance settings could not be saved.'
       });
+      return false;
     }
   };
 
-  const resetTheme = async () => {
+  const resetTheme = async (): Promise<boolean> => {
     try {
-      setTheme(DEFAULT_THEME);
-      applyThemeToDOM(DEFAULT_THEME);
-      await apiFetch('/api/theme/reset', {
+      const res = await apiFetch('/api/theme/reset', {
         method: 'POST'
       });
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => null);
+        throw new Error(errorBody?.error || 'The default appearance could not be saved.');
+      }
+
+      const savedTheme = await res.json() as WebsiteTheme;
+      setTheme(savedTheme);
+      applyThemeToDOM(savedTheme);
       addToast({
-        type: 'info',
+        type: 'success',
         title: 'Theme Reset to Default',
-        description: 'Restored original SLSU Forest Green & Gold institutional palette.'
+        description: 'Restored and saved the official SLSU appearance defaults.'
       });
-    } catch {}
+      return true;
+    } catch (error) {
+      console.error('Failed to reset website appearance:', error);
+      addToast({
+        type: 'error',
+        title: 'Appearance Not Reset',
+        description: error instanceof Error ? error.message : 'The default appearance could not be saved.'
+      });
+      return false;
+    }
   };
 
   // System Settings
-  const updateSystemSettings = async (newSettings: Partial<SystemSettings>) => {
+  const updateSystemSettings = async (newSettings: Partial<SystemSettings>): Promise<boolean> => {
     try {
       const res = await apiFetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings)
       });
-      if (res.ok) {
-        const data = await res.json();
-        setSystemSettings(data);
-        addToast({
-          type: 'success',
-          title: 'Settings Saved',
-          description: 'Institutional accreditation configurations updated.'
-        });
-      }
-    } catch {
-      setSystemSettings(prev => ({ ...prev, ...newSettings }));
+      if (!res.ok) throw new Error(await getApiError(res, 'Could not save institutional settings.'));
+
+      const data = await res.json();
+      setSystemSettings(data);
+      addToast({
+        type: 'success',
+        title: 'Settings Saved',
+        description: 'Institutional accreditation configurations updated.'
+      });
+      return true;
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Settings Not Saved',
+        description: error instanceof Error ? error.message : 'Could not save institutional settings.'
+      });
+      return false;
     }
   };
 
@@ -1034,18 +1117,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateFollowUpStatus = async (evalId: string, status: 'none' | 'pending' | 'in_progress' | 'resolved', notes: string) => {
+  const updateFollowUpStatus = async (evalId: string, status: 'none' | 'pending' | 'in_progress' | 'resolved', notes: string): Promise<boolean> => {
     try {
       const res = await apiFetch(`/api/evaluations/${evalId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, notes })
       });
-      if (res.ok) {
-        setEvaluations(prev => prev.map(e => e.id === evalId ? { ...e, adminFollowUpStatus: status, adminNotes: notes } : e));
-      }
-    } catch {
+      if (!res.ok) throw new Error(await getApiError(res, 'Could not update the evaluation follow-up status.'));
+
       setEvaluations(prev => prev.map(e => e.id === evalId ? { ...e, adminFollowUpStatus: status, adminNotes: notes } : e));
+      addToast({ type: 'success', title: 'Follow-up Status Updated', description: `Status changed to ${status}.` });
+      return true;
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Follow-up Status Not Saved',
+        description: error instanceof Error ? error.message : 'Could not update the evaluation follow-up status.'
+      });
+      return false;
     }
   };
 

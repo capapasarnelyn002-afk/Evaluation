@@ -237,32 +237,36 @@ export const AdminDashboard: React.FC = () => {
 
   const handleSaveStatus = async () => {
     if (!statusTarget) return;
-    await updateFollowUpStatus(statusTarget.id, statusVal, statusNotes);
-    addToast({
-      type: 'success',
-      title: 'Follow-up Status Updated',
-      description: `Control No: ${statusTarget.controlNumber} set to ${statusVal}`
-    });
-    setStatusTarget(null);
+    if (await updateFollowUpStatus(statusTarget.id, statusVal, statusNotes)) {
+      setStatusTarget(null);
+    }
   };
 
   const handleCreateActivity = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createActivity({
-      title: newActTitle,
-      activityType: newActType,
-      description: newActDescription,
-      date: newActDate,
-      venue: newActVenue,
-      targetBeneficiaries: newActBeneficiaries,
-      organizingDepartment: newActDept,
-      leadCoordinator: newActCoordinator,
-      trainerOrSpeaker: newActSpeaker,
-      totalTargetParticipants: newActTargetCount
-    });
-    setShowNewActivityModal(false);
-    setNewActTitle('');
-    setNewActDescription('');
+    try {
+      await createActivity({
+        title: newActTitle,
+        activityType: newActType,
+        description: newActDescription,
+        date: newActDate,
+        venue: newActVenue,
+        targetBeneficiaries: newActBeneficiaries,
+        organizingDepartment: newActDept,
+        leadCoordinator: newActCoordinator,
+        trainerOrSpeaker: newActSpeaker,
+        totalTargetParticipants: newActTargetCount
+      });
+      setShowNewActivityModal(false);
+      setNewActTitle('');
+      setNewActDescription('');
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Activity Not Saved',
+        description: error instanceof Error ? error.message : 'Could not create this activity.'
+      });
+    }
   };
 
   return (

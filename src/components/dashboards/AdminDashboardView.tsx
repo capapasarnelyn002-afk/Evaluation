@@ -189,11 +189,6 @@ export const AdminDashboardView: React.FC = () => {
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     await updateSystemSettings(settingsForm);
-    addToast({
-      type: 'success',
-      title: 'Settings Saved',
-      description: 'Institutional accreditation benchmarks updated.'
-    });
   };
 
   const handleOpenStatusModal = (sub: EvaluationSubmission) => {
@@ -204,15 +199,16 @@ export const AdminDashboardView: React.FC = () => {
 
   const handleSaveStatus = async () => {
     if (!statusTarget) return;
-    await updateFollowUpStatus(statusTarget.id, statusVal, statusNotes);
-    setStatusTarget(null);
+    if (await updateFollowUpStatus(statusTarget.id, statusVal, statusNotes)) {
+      setStatusTarget(null);
+    }
   };
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserName.trim() || !newUserEmail.trim()) return;
 
-    await createUserAccount({
+    const created = await createUserAccount({
       name: newUserName.trim(),
       email: newUserEmail.trim(),
       role: newUserRole,
@@ -220,6 +216,7 @@ export const AdminDashboardView: React.FC = () => {
       title: newUserTitle,
       status: 'active'
     });
+    if (!created) return;
 
     setShowAddUserModal(false);
     setNewUserName('');

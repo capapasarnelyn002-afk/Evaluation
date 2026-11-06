@@ -38,22 +38,41 @@ export default async function handler(_request: Request, response: Response) {
   }
 
   try {
-    const databaseResponse = await fetch(`${credentials.projectUrl}/rest/v1/users?select=id&limit=1`, {
-      headers,
-      signal: AbortSignal.timeout(8_000)
-    });
+    const snapshotHeaders = new Headers(headers);
+    snapshotHeaders.set('Content-Type', 'application/json');
+    const [databaseResponse, snapshotResponse] = await Promise.all([
+      fetch(`${credentials.projectUrl}/rest/v1/users?select=id&limit=1`, {
+        headers,
+        signal: AbortSignal.timeout(8_000)
+      }),
+      fetch(`${credentials.projectUrl}/rest/v1/rpc/load_app_snapshot`, {
+        method: 'POST',
+        headers: snapshotHeaders,
+        body: '{}',
+        signal: AbortSignal.timeout(8_000)
+      })
+    ]);
 
-    if (databaseResponse.ok) {
+    if (databaseResponse.ok && snapshotResponse.ok) {
+      const snapshot = await snapshotResponse.json() as { themePersistenceReady?: boolean };
+      if (!snapshot.themePersistenceReady) {
+        sendJson(response, 503, {
+          connected: false,
+          hint: 'The application database needs the latest supabase/schema.sql so appearance settings can be saved.'
+        });
+        return;
+      }
       sendJson(response, 200, { connected: true });
       return;
     }
 
-    const hint = databaseResponse.status === 401 || databaseResponse.status === 403
+    const failedResponse = databaseResponse.ok ? snapshotResponse : databaseResponse;
+    const hint = failedResponse.status === 401 || failedResponse.status === 403
       ? 'Supabase rejected the server key. Confirm it belongs to the project in SUPABASE_URL.'
-      : databaseResponse.status === 404
-        ? 'The Supabase users table was not found. Run supabase/schema.sql in the SQL Editor.'
-        : 'Supabase could not complete the database check.';
-    console.error(`Supabase database status check failed with HTTP ${databaseResponse.status}.`);
+      : failedResponse.status === 404
+        ? 'The Supabase application schema or load_app_snapshot function was not found. Run the latest supabase/schema.sql in the SQL Editor.'
+        : 'Supabase could not complete the database or application persistence check.';
+    console.error(`Supabase database status check failed with HTTP ${failedResponse.status}.`);
     sendJson(response, 503, { connected: false, hint });
   } catch (error) {
     console.error('Supabase database status request failed:', error);

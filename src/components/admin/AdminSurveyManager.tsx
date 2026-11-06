@@ -178,7 +178,6 @@ export const AdminSurveyManager: React.FC = () => {
   const handleDelete = async (id: string, title: string) => {
     if (confirm(`Are you sure you want to delete the survey "${title}"?`)) {
       await deleteSurvey(id);
-      addToast({ type: 'info', title: 'Survey Removed', description: `"${title}" has been deleted.` });
     }
   };
 

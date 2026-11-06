@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useApp } from '../../context/AppContext';
+import { DEFAULT_THEME, useApp } from '../../context/AppContext';
 import { WebsiteTheme, TypographySettings, LogoHistoryItem } from '../../types';
 import { 
   Palette, 
@@ -397,14 +397,14 @@ export const WebsiteAppearanceManager: React.FC = () => {
       addToast({ type: 'info', title: 'Permission Restricted', description: 'Only administrators can modify design presets.' });
       return;
     }
-    setSelectedPreset(preset.id);
     const updated = { ...formTheme, ...preset.theme };
+    if (!await updateTheme(preset.theme, false)) return;
+    setSelectedPreset(preset.id);
     setFormTheme(updated);
-    await updateTheme(preset.theme, false);
     addToast({
-      type: 'info',
+      type: 'success',
       title: 'Preset Applied',
-      description: `Applied palette: ${preset.name}`
+      description: `Saved and applied palette: ${preset.name}`
     });
   };
 
@@ -442,11 +442,11 @@ export const WebsiteAppearanceManager: React.FC = () => {
   const handleReset = async () => {
     if (role !== 'admin') return;
     if (confirm('Reset website appearance, sidebar logo styling, and typography to default SLSU standards?')) {
-      await resetTheme();
+      if (!await resetTheme()) return;
       const defaultPreset = PRESET_THEMES[0];
       setSelectedPreset(defaultPreset.id);
       setFormTheme({
-        ...defaultPreset.theme as WebsiteTheme,
+        ...DEFAULT_THEME,
         typography: { ...DEFAULT_TYPOGRAPHY_CONFIG }
       });
       setUploadedFilePreview(null);
@@ -1938,10 +1938,10 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600 space-y-1">
                 <span className="font-bold text-slate-800 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Immediate Live Application</span>
+                  <span>Live Preview & Saved Appearance</span>
                 </span>
                 <p className="text-[11px] leading-relaxed">
-                  Imported files, image URLs, and history restorations update instantly in the preview and across the interface. Click <strong className="text-slate-900">Save Changes</strong> to persist the logo across all devices.
+                  Edits appear in this preview first. Save the configuration to apply it across the system; it updates only after the database confirms the save.
                 </p>
               </div>
             </div>

@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 export const EvaluationFormBuilder: React.FC = () => {
-  const { forms, activities, createForm, updateForm, deleteForm, duplicateForm, theme, systemSettings, role, isLoading } = useApp();
+  const { forms, activities, createForm, updateForm, deleteForm, duplicateForm, theme, systemSettings, role, isLoading, addToast } = useApp();
 
   const [activeFormId, setActiveFormId] = useState<string>(forms[0]?.id || '');
   const [editingForm, setEditingForm] = useState<EvaluationForm | null>(null);
@@ -633,7 +633,13 @@ export const EvaluationFormBuilder: React.FC = () => {
                     <span>Edit Form Rubric</span>
                   </button>
                   <button
-                    onClick={() => duplicateForm(currentForm.id)}
+                    onClick={() => {
+                      void duplicateForm(currentForm.id).catch(error => addToast({
+                        type: 'error',
+                        title: 'Form Duplication Failed',
+                        description: error instanceof Error ? error.message : 'The evaluation form could not be duplicated.'
+                      }));
+                    }}
                     className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"
                     title="Duplicate Form"
                   >

@@ -41,7 +41,8 @@ export const EvaluationActivityManager: React.FC = () => {
     setSelectedActivityId,
     role,
     systemSettings,
-    maskPII
+    maskPII,
+    addToast
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -144,13 +145,20 @@ export const EvaluationActivityManager: React.FC = () => {
       assignedFormId: formAssignedRubric
     };
 
-    if (editingActivity) {
-      await updateActivity(editingActivity.id, payload);
-    } else {
-      await createActivity(payload);
+    try {
+      if (editingActivity) {
+        await updateActivity(editingActivity.id, payload);
+      } else {
+        await createActivity(payload);
+      }
+      setShowModal(false);
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Activity Not Saved',
+        description: error instanceof Error ? error.message : 'Could not save this activity.'
+      });
     }
-
-    setShowModal(false);
   };
 
   const filteredActivities = activities.filter(act => {
@@ -358,7 +366,13 @@ export const EvaluationActivityManager: React.FC = () => {
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => duplicateActivity(act.id)}
+                    onClick={() => {
+                      void duplicateActivity(act.id).catch(error => addToast({
+                        type: 'error',
+                        title: 'Activity Duplication Failed',
+                        description: error instanceof Error ? error.message : 'The activity could not be duplicated.'
+                      }));
+                    }}
                     className="p-1.5 rounded border border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer"
                     title="Duplicate as Template"
                   >

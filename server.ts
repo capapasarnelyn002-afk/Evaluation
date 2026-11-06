@@ -22,6 +22,8 @@ app.use((req, res, next) => {
     req.path.startsWith('/api/') &&
     !req.path.startsWith('/api/ai/') &&
     !req.path.startsWith('/api/auth/') &&
+    req.path !== '/api/theme' &&
+    req.path !== '/api/theme/reset' &&
     ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
 
   if (isStateMutation) {
@@ -861,7 +863,16 @@ app.post('/api/auth/login', async (req, res) => {
     if (user.status !== 'active') return res.status(403).json({ error: 'This account has been deactivated.' });
     if (!authData.access_token) throw new Error('Supabase authentication response did not include an access token.');
 
-    user.lastLogin = new Date().toISOString();
+    const lastLogin = new Date().toISOString();
+    await supabaseStateRequest(`users?id=eq.${encodeURIComponent(user.id)}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      },
+      body: JSON.stringify({ lastLogin })
+    });
+    user.lastLogin = lastLogin;
     return res.json({ token: authData.access_token, user });
   } catch (error) {
     console.error('Supabase sign-in failed:', error);
@@ -1607,7 +1618,11 @@ app.get('/api/theme', (_req, res) => {
   res.json(currentTheme);
 });
 
-app.post('/api/theme', (req, res) => {
+app.post('/api/theme', async (req, res) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'A valid appearance configuration is required.' });
+  }
+
   // Validate typography bounds and font colors if provided
   if (req.body.typography) {
     const typo = req.body.typography;
@@ -1638,35 +1653,52 @@ app.post('/api/theme', (req, res) => {
   if (req.body.fontColorMuted && !isValidColor(req.body.fontColorMuted)) delete req.body.fontColorMuted;
   if (req.body.fontColorLabel && !isValidColor(req.body.fontColorLabel)) delete req.body.fontColorLabel;
 
-  currentTheme = { 
+  const nextTheme = {
     ...currentTheme, 
     ...req.body,
     typography: req.body.typography || currentTheme.typography 
   };
 
-  auditLogs.unshift({
+  const auditLog = {
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
     adminName: 'Administrator',
     action: req.body.typography ? 'TYPOGRAPHY_AND_THEME_SAVED' : 'THEME_CUSTOMIZATION_SAVED',
     resourceId: 'website_theme',
-    reason: `Applied customized brand typography & theme settings (Base: ${currentTheme.typography?.baseFontSize || 1}rem)`
-  });
+    reason: `Applied customized brand typography & theme settings (Base: ${nextTheme.typography?.baseFontSize || 1}rem)`
+  };
 
-  res.json(currentTheme);
+  try {
+    await saveWebsiteTheme(nextTheme, auditLog);
+    currentTheme = nextTheme;
+    auditLogs.unshift(auditLog);
+    return res.json(currentTheme);
+  } catch (error) {
+    console.error('Failed to save website appearance:', error);
+    return res.status(503).json({ error: 'Appearance settings could not be saved to the database.' });
+  }
 });
 
-app.post('/api/theme/reset', (req, res) => {
-  currentTheme = { ...DEFAULT_THEME };
-  auditLogs.unshift({
+app.post('/api/theme/reset', async (_req, res) => {
+  const nextTheme = structuredClone(DEFAULT_THEME);
+  const auditLog = {
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
     adminName: 'Administrator',
     action: 'THEME_RESET_DEFAULT',
     resourceId: 'website_theme',
     reason: 'Restored default SLSU institutional brand palette & typography standards'
-  });
-  res.json(currentTheme);
+  };
+
+  try {
+    await saveWebsiteTheme(nextTheme, auditLog);
+    currentTheme = nextTheme;
+    auditLogs.unshift(auditLog);
+    return res.json(currentTheme);
+  } catch (error) {
+    console.error('Failed to reset website appearance:', error);
+    return res.status(503).json({ error: 'Default appearance settings could not be saved to the database.' });
+  }
 });
 
 // ==========================================
@@ -1918,6 +1950,14 @@ async function supabaseStateRequest(path: string, init?: RequestInit) {
   return response;
 }
 
+async function saveWebsiteTheme(theme: typeof currentTheme, auditLog: AuditLog) {
+  await supabaseStateRequest('rpc/save_website_theme', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_theme: theme, p_audit_log: auditLog })
+  });
+}
+
 async function saveServerState() {
   await supabaseStateRequest('rpc/save_app_snapshot', {
     method: 'POST',
@@ -1941,7 +1981,12 @@ async function hydrateServerState() {
 let initializationPromise: Promise<void> | undefined;
 
 export function initializeServer() {
-  initializationPromise ??= hydrateServerState();
+  if (!initializationPromise) {
+    initializationPromise = hydrateServerState().catch(error => {
+      initializationPromise = undefined;
+      throw error;
+    });
+  }
   return initializationPromise;
 }
 

@@ -149,6 +149,38 @@ grant all on public.users, public.activities, public.evaluation_forms, public.ev
   public.website_themes to service_role;
 grant usage on schema public to service_role;
 
+-- Isolate theme writes so unrelated snapshot rows cannot block appearance saves.
+create or replace function public.save_website_theme(p_theme jsonb, p_audit_log jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.website_themes (id, data, "updatedAt")
+  values ('default', p_theme, now())
+  on conflict (id) do update
+    set data = excluded.data, "updatedAt" = excluded."updatedAt";
+
+  insert into public.audit_logs (
+    id, timestamp, "adminName", action, "resourceId", reason, __position
+  )
+  values (
+    p_audit_log->>'id',
+    (p_audit_log->>'timestamp')::timestamptz,
+    p_audit_log->>'adminName',
+    p_audit_log->>'action',
+    p_audit_log->>'resourceId',
+    p_audit_log->>'reason',
+    (select coalesce(min(__position), 0) - 1 from public.audit_logs)
+  )
+  on conflict (id) do nothing;
+end;
+$$;
+
+revoke all on function public.save_website_theme(jsonb, jsonb) from public, anon, authenticated;
+grant execute on function public.save_website_theme(jsonb, jsonb) to service_role;
+
 create or replace function public.create_application_profile()
 returns trigger
 language plpgsql
@@ -248,10 +280,6 @@ begin
   insert into public.system_settings (id, data, "updatedAt")
   values ('default', coalesce(p_snapshot->'systemSettings', '{}'::jsonb), now())
   on conflict (id) do update set data = excluded.data, "updatedAt" = excluded."updatedAt";
-
-  insert into public.website_themes (id, data, "updatedAt")
-  values ('default', coalesce(p_snapshot->'currentTheme', '{}'::jsonb), now())
-  on conflict (id) do update set data = excluded.data, "updatedAt" = excluded."updatedAt";
 end;
 $$;
 
@@ -270,7 +298,8 @@ as $$
     'surveys', coalesce((select jsonb_agg(to_jsonb(t) - '__position' order by t.__position) from public.surveys t), '[]'::jsonb),
     'surveyResponses', coalesce((select jsonb_agg(to_jsonb(t) - '__position' order by t.__position) from public.survey_responses t), '[]'::jsonb),
     'systemSettings', (select data from public.system_settings where id = 'default'),
-    'currentTheme', (select data from public.website_themes where id = 'default')
+    'currentTheme', (select data from public.website_themes where id = 'default'),
+    'themePersistenceReady', to_regprocedure('public.save_website_theme(jsonb,jsonb)') is not null
   );
 $$;
 
