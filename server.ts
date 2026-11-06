@@ -15,9 +15,6 @@ app.use(express.json({ limit: '10mb' }));
 const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/+$/, '');
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-if (!supabaseUrl || !supabaseSecretKey || !supabasePublishableKey) {
-  throw new Error('SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY must be configured.');
-}
 
 let persistenceQueue = Promise.resolve();
 
@@ -150,25 +147,6 @@ export interface ServerUser {
 
 const users: ServerUser[] = [];
 
-const DEMO_ACCOUNT_EMAIL = 'admin@example.com';
-const DEMO_ACCOUNT_ID = 'demo-admin';
-
-function ensureDefaultDemoAccount() {
-  if (users.some((user) => user.email.toLowerCase() === DEMO_ACCOUNT_EMAIL)) return;
-  if (users.length > 0) return;
-
-  users.push({
-    id: DEMO_ACCOUNT_ID,
-    name: 'Demo Administrator',
-    email: DEMO_ACCOUNT_EMAIL,
-    role: 'admin',
-    department: 'Demo',
-    title: 'Demo Administrator',
-    status: 'active',
-    lastLogin: new Date().toISOString()
-  });
-}
-
 let systemSettings = {
   institutionName: 'Southern Leyte State University - Hinunangan Campus',
   campusCode: 'SLSU-HIN',
@@ -206,7 +184,7 @@ async function getAuthenticatedAccount(accessToken: string): Promise<ServerUser 
 }
 
 app.use('/api', async (req, res, next) => {
-  if (['/auth/login', '/auth/me', '/auth/logout', '/database/status'].includes(req.path)) return next();
+  if (['/auth/login', '/auth/me', '/auth/logout', '/database/status', '/health'].includes(req.path)) return next();
 
   const accessToken = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!accessToken) return res.status(401).json({ error: 'A valid sign-in session is required.' });
@@ -841,6 +819,9 @@ app.post('/api/auth/login', async (req, res) => {
   if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
+  if (!supabaseUrl || !supabasePublishableKey) {
+    return res.status(503).json({ error: 'Supabase authentication is not configured on the server.' });
+  }
 
   try {
     const authResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
@@ -848,7 +829,18 @@ app.post('/api/auth/login', async (req, res) => {
       headers: { apikey: supabasePublishableKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email.trim(), password })
     });
-    if (!authResponse.ok) return res.status(401).json({ error: 'Invalid email or password.' });
+    if (!authResponse.ok) {
+      const errorBody = await authResponse.text();
+      if (
+        authResponse.status >= 500 ||
+        authResponse.status === 429 ||
+        /invalid api key|no api key|invalid jwt/i.test(errorBody)
+      ) {
+        console.error(`Supabase sign-in service returned HTTP ${authResponse.status}.`);
+        return res.status(502).json({ error: 'The authentication service is unavailable. Check the Supabase server configuration.' });
+      }
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
 
     const authData = await authResponse.json() as { access_token?: string; user?: { id?: string } };
     const user = users.find(account => account.id === authData.user?.id);
@@ -867,6 +859,9 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/auth/me', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ error: 'A valid sign-in session is required.' });
+  if (!supabaseUrl || !supabasePublishableKey) {
+    return res.status(503).json({ error: 'Supabase authentication is not configured on the server.' });
+  }
 
   try {
     const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
@@ -887,6 +882,9 @@ app.get('/api/auth/me', async (req, res) => {
 app.post('/api/auth/logout', async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (token) {
+    if (!supabaseUrl || !supabasePublishableKey) {
+      return res.status(503).json({ error: 'Supabase authentication is not configured on the server.' });
+    }
     try {
       await fetch(`${supabaseUrl}/auth/v1/logout`, {
         method: 'POST',
@@ -900,6 +898,10 @@ app.post('/api/auth/logout', async (req, res) => {
   return res.json({ success: true });
 });
 
+app.get('/api/health', (_req, res) => {
+  return res.status(200).json({ status: 'ok', service: 'evaluation-api' });
+});
+
 app.get('/api/database/status', async (_req, res) => {
   try {
     await supabaseStateRequest('users?select=id&limit=1');
@@ -909,8 +911,10 @@ app.get('/api/database/status', async (_req, res) => {
     const message = error instanceof Error ? error.message : '';
     const hint = message.includes('credentials are not configured')
       ? 'Configure SUPABASE_URL and SUPABASE_SECRET_KEY in the deployment environment.'
+      : message.includes('SUPABASE_URL')
+        ? 'Set SUPABASE_URL to the project URL from the same Supabase project as the API keys.'
       : message.includes('(401)') || message.includes('(403)')
-        ? 'Supabase rejected the server key. Check SUPABASE_SECRET_KEY in the deployment environment.'
+        ? 'Supabase rejected the server key. Check that SUPABASE_SECRET_KEY belongs to this project and is current.'
         : message.includes('(404)')
           ? 'The Supabase users table was not found. Run supabase/schema.sql in the Supabase SQL Editor.'
           : 'Check the Supabase project URL, server key, and database availability.';
@@ -955,6 +959,9 @@ app.post('/api/users', async (req, res) => {
   const { name, email, role, department, title } = req.body;
   if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || !email.trim()) {
     return res.status(400).json({ error: 'Name and email are required fields.' });
+  }
+  if (!supabaseUrl || !supabaseSecretKey) {
+    return res.status(503).json({ error: 'Supabase account management is not configured on the server.' });
   }
 
   const normalizedEmail = email.toLowerCase().trim();
@@ -1784,6 +1791,9 @@ app.post('/api/users/:id/reset', async (req, res) => {
     res.status(404).json({ error: 'User not found' });
     return;
   }
+  if (!supabaseUrl || !supabasePublishableKey) {
+    return res.status(503).json({ error: 'Supabase authentication is not configured on the server.' });
+  }
 
   try {
     const resetResponse = await fetch(`${supabaseUrl}/auth/v1/recover`, {
@@ -1872,8 +1882,6 @@ function restoreServerState(saved: unknown) {
 
   if (state.systemSettings && typeof state.systemSettings === 'object') systemSettings = state.systemSettings;
   if (state.currentTheme && typeof state.currentTheme === 'object') currentTheme = state.currentTheme;
-
-  ensureDefaultDemoAccount();
 }
 
 async function supabaseStateRequest(path: string, init?: RequestInit) {
@@ -1885,7 +1893,7 @@ async function supabaseStateRequest(path: string, init?: RequestInit) {
     ...init,
     headers: {
       apikey: supabaseSecretKey,
-      Authorization: `Bearer ${supabaseSecretKey}`,
+      ...(supabaseSecretKey.startsWith('sb_secret_') ? {} : { Authorization: `Bearer ${supabaseSecretKey}` }),
       ...(init?.headers || {})
     }
   });
@@ -1914,7 +1922,6 @@ async function hydrateServerState() {
     body: '{}'
   });
   restoreServerState(await response.json());
-  await saveServerState();
   console.log('Loaded application data from normalized Supabase tables.');
 }
 
