@@ -1,6 +1,5 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -1938,6 +1937,7 @@ async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
 
   if (!isProduction) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
