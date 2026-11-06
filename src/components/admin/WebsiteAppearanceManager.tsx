@@ -14,8 +14,11 @@ import {
   Sliders,
   X,
   ShieldCheck,
+  HelpCircle,
+  LogOut,
   Table,
   CheckSquare,
+  FileEdit,
   BarChart3,
   Calendar,
   PanelLeft,
@@ -354,7 +357,7 @@ const SAMPLE_INSTITUTIONAL_LOGOS = [
 ];
 
 export const WebsiteAppearanceManager: React.FC = () => {
-  const { theme, updateTheme, resetTheme, addToast, role, currentUser } = useApp();
+  const { theme, updateTheme, resetTheme, addToast, role, currentUser, activities, forms } = useApp();
 
   const [activeTab, setActiveTab] = useState<'sidebar' | 'typography' | 'colors'>('sidebar');
   const [logoSourceTab, setLogoSourceTab] = useState<'upload' | 'url' | 'preset'>('upload');
@@ -1766,7 +1769,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               >
                 {/* Top Brand Header in Preview */}
                 <div 
-                  className={`h-16 flex items-center border-b px-3 ${previewSidebarCollapsed ? 'justify-center relative' : 'justify-between'}`}
+                  className={`h-16 flex items-center border-b ${previewSidebarCollapsed ? 'justify-center px-2 relative' : 'justify-between px-4'}`}
                   style={{ borderColor: currentBorderColor }}
                 >
                   {previewSidebarCollapsed ? (
@@ -1779,7 +1782,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                         <img 
                           src={formTheme.sidebarLogoUrl} 
                           alt="Logo" 
-                          className="w-7 h-7 object-contain" 
+                          className="w-6 h-6 object-contain"
                           onError={(e) => { e.currentTarget.style.display = 'none'; }}
                         />
                       ) : (
@@ -1796,7 +1799,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                           <img 
                             src={formTheme.sidebarLogoUrl} 
                             alt="Logo" 
-                            className="w-6 h-6 object-contain" 
+                            className="w-5.5 h-5.5 object-contain"
                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                           />
                         ) : (
@@ -1829,59 +1832,56 @@ export const WebsiteAppearanceManager: React.FC = () => {
 
                 {/* User Role Indicator in Preview */}
                 {!previewSidebarCollapsed && (
-                  <div className="px-3.5 py-2.5 bg-slate-50/70 border-b" style={{ borderColor: currentBorderColor }}>
+                  <div className="px-4 py-3 border-b" style={{ borderColor: currentBorderColor, backgroundColor: currentSidebarBg }}>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                         Current Role
                       </span>
                       <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-purple-100 text-purple-900 border border-purple-300">
-                        ADMIN
+                        {role}
                       </span>
                     </div>
-                    <p className="text-xs font-bold text-slate-900 mt-0.5 truncate">
+                    <p className="text-xs font-bold mt-0.5 truncate" style={{ color: currentSidebarTextColor }}>
                       {currentUser.name}
                     </p>
-                    <p className="text-[10px] text-slate-500 truncate">
-                      Campus Quality Assurance Director
+                    <p className="text-[10px] opacity-70 truncate" style={{ color: currentSidebarTextColor }}>
+                      {currentUser.title || currentUser.department}
                     </p>
                   </div>
                 )}
 
                 {/* Simulated Menu Items */}
-                <div className="p-2 space-y-1">
+                <div className="p-2 space-y-1 mt-2">
                   {/* Item 1: Active item */}
                   <div
-                    className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold shadow-xs ${
-                      previewSidebarCollapsed ? 'justify-center px-1.5' : ''
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold ${
+                      previewSidebarCollapsed ? 'justify-center px-2' : ''
                     }`}
-                    style={{ backgroundColor: currentActiveBg, color: currentActiveText }}
+                    style={{ color: currentSidebarTextColor }}
                   >
-                    <div style={{ color: currentSidebarLogoColor }}>
+                    <div>
                       <BarChart3 className="w-4 h-4" />
                     </div>
                     {!previewSidebarCollapsed && (
                       <div className="flex-1 flex items-center justify-between">
                         <span>Dashboard</span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20 text-white font-bold">
-                          Live
-                        </span>
                       </div>
                     )}
                   </div>
 
                   {/* Item 2: Evaluation Activities */}
                   <div
-                    className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold hover:bg-slate-100/50 ${
-                      previewSidebarCollapsed ? 'justify-center px-1.5' : ''
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold hover:bg-slate-50 ${
+                      previewSidebarCollapsed ? 'justify-center px-2' : ''
                     }`}
                     style={{ color: currentSidebarTextColor }}
                   >
-                    <Calendar className="w-4 h-4 text-slate-400" />
+                    <Calendar className="w-4 h-4" />
                     {!previewSidebarCollapsed && (
                       <div className="flex-1 flex items-center justify-between">
                         <span>Evaluation Activities</span>
                         <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-bold">
-                          5
+                          {activities.length}
                         </span>
                       </div>
                     )}
@@ -1889,43 +1889,48 @@ export const WebsiteAppearanceManager: React.FC = () => {
 
                   {/* Item 3: Evaluation Form Builder */}
                   <div
-                    className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold hover:bg-slate-100/50 ${
-                      previewSidebarCollapsed ? 'justify-center px-1.5' : ''
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold hover:bg-slate-50 ${
+                      previewSidebarCollapsed ? 'justify-center px-2' : ''
                     }`}
                     style={{ color: currentSidebarTextColor }}
                   >
-                    <Award className="w-4 h-4 text-slate-400" />
+                    <FileEdit className="w-4 h-4" />
                     {!previewSidebarCollapsed && (
-                      <span>Form Builder</span>
+                      <div className="flex-1 flex items-center justify-between text-left truncate">
+                        <span>Evaluation Form Builder</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-bold">
+                          {forms.length}
+                        </span>
+                      </div>
                     )}
                   </div>
 
                   {/* Item 4: Website Appearance (active indicator) */}
                   <div
-                    className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold border border-dashed border-emerald-300 bg-emerald-50/50 text-emerald-950 ${
-                      previewSidebarCollapsed ? 'justify-center px-1.5' : ''
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold ${
+                      previewSidebarCollapsed ? 'justify-center px-2' : ''
                     }`}
+                    style={{ backgroundColor: currentActiveBg, color: currentActiveText }}
                   >
-                    <Palette className="w-4 h-4 text-emerald-700" />
+                    <Palette className="w-4 h-4" style={{ color: currentSidebarLogoColor }} />
                     {!previewSidebarCollapsed && (
-                      <div className="flex-1 flex items-center justify-between">
+                      <div className="flex-1 flex items-center justify-between text-left truncate">
                         <span>Sidebar & Appearance</span>
-                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-extrabold bg-emerald-800 text-white">
-                          Current
-                        </span>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Bottom Footer Note in Preview */}
-                <div className="p-3 border-t bg-slate-50/50 text-center" style={{ borderColor: currentBorderColor }}>
-                  <p className="text-[10px] text-slate-500 font-medium">
-                    Southern Leyte State University
-                  </p>
-                  <p className="text-[9px] text-slate-400">
-                    Hinunangan Campus • BSIT
-                  </p>
+                <div className="p-3 border-t space-y-2" style={{ borderColor: currentBorderColor, backgroundColor: currentSidebarBg }}>
+                  <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium" style={{ color: currentSidebarTextColor }}>
+                    <HelpCircle className="w-4 h-4 text-slate-400 shrink-0" />
+                    {!previewSidebarCollapsed && <span>SLSU Capstone 2026</span>}
+                  </div>
+                  <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-rose-700">
+                    <LogOut className="w-4 h-4 text-rose-600 shrink-0" />
+                    {!previewSidebarCollapsed && <span>Sign Out</span>}
+                  </div>
                 </div>
               </div>
 

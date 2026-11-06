@@ -218,7 +218,10 @@ export const Sidebar: React.FC = () => {
 
         {/* User Identity / Role Pill */}
         {!sidebarCollapsed && (
-          <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100">
+          <div
+            className="px-4 py-3 border-b"
+            style={{ backgroundColor: theme.sidebarBgColor, borderColor: sidebarBorder }}
+          >
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                 Current Role
@@ -227,10 +230,10 @@ export const Sidebar: React.FC = () => {
                 {role}
               </span>
             </div>
-            <p className="text-xs font-bold text-slate-900 mt-1 truncate">
+            <p className="text-xs font-bold mt-1 truncate" style={{ color: theme.sidebarTextColor }}>
               {currentUser.name}
             </p>
-            <p className="text-[11px] text-slate-500 truncate">
+            <p className="text-[11px] truncate opacity-70" style={{ color: theme.sidebarTextColor }}>
               {currentUser.title || currentUser.department}
             </p>
           </div>
@@ -249,10 +252,13 @@ export const Sidebar: React.FC = () => {
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   isActive
-                    ? 'text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'shadow-xs'
+                    : 'hover:bg-slate-50'
                 } ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
-                style={isActive ? { backgroundColor: activeItemBg, color: activeItemText } : {}}
+                style={{
+                  color: isActive ? activeItemText : theme.sidebarTextColor,
+                  ...(isActive ? { backgroundColor: activeItemBg } : {})
+                }}
                 title={sidebarCollapsed ? item.label : undefined}
               >
                 <div style={isActive ? { color: logoColor } : {}}>
@@ -277,13 +283,17 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Bottom profile and account actions */}
-      <div className="p-3 border-t border-slate-100 space-y-2 bg-slate-50/50">
+      <div
+        className="p-3 border-t space-y-2"
+        style={{ borderColor: sidebarBorder, backgroundColor: theme.sidebarBgColor, color: theme.sidebarTextColor }}
+      >
         {/* Capstone Project Info */}
         <button
           onClick={() => setShowAboutModal(true)}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer ${
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium hover:bg-slate-100 transition-colors cursor-pointer ${
             sidebarCollapsed ? 'justify-center px-2' : ''
           }`}
+          style={{ color: theme.sidebarTextColor }}
           title="Capstone Defense Information (May 2026)"
         >
           <HelpCircle className="w-4 h-4 text-slate-400 shrink-0" />

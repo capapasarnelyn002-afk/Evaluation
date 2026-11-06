@@ -659,24 +659,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateTheme = async (newTheme: Partial<WebsiteTheme>, showToast = false) => {
     try {
       const merged = { ...theme, ...newTheme };
-      setTheme(merged);
-      applyThemeToDOM(merged);
       const res = await apiFetch('/api/theme', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(merged)
       });
-      if (res.ok && showToast) {
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => null);
+        throw new Error(errorBody?.error || 'The appearance settings could not be saved.');
+      }
+
+      const savedTheme = await res.json() as WebsiteTheme;
+      setTheme(savedTheme);
+      applyThemeToDOM(savedTheme);
+      if (showToast) {
         addToast({
           type: 'success',
           title: 'Theme Customization Published',
-          description: 'Global colors and branding updated across the website.'
+          description: 'The saved appearance is now applied across the website.'
         });
       }
-    } catch {
-      if (showToast) {
-        addToast({ type: 'info', title: 'Theme Updated', description: 'Saved locally in browser session.' });
-      }
+    } catch (error) {
+      console.error('Failed to save website appearance:', error);
+      addToast({
+        type: 'error',
+        title: 'Appearance Not Saved',
+        description: error instanceof Error ? error.message : 'The appearance settings could not be saved.'
+      });
     }
   };
 
