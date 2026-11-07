@@ -280,6 +280,19 @@ begin
   insert into public.system_settings (id, data, "updatedAt")
   values ('default', coalesce(p_snapshot->'systemSettings', '{}'::jsonb), now())
   on conflict (id) do update set data = excluded.data, "updatedAt" = excluded."updatedAt";
+
+  insert into public.website_themes (id, data, "updatedAt")
+  values (
+    'default',
+    coalesce(
+      p_snapshot->'currentTheme',
+      p_snapshot->'websiteThemes',
+      p_snapshot->'theme',
+      '{}'::jsonb
+    ),
+    now()
+  )
+  on conflict (id) do update set data = excluded.data, "updatedAt" = excluded."updatedAt";
 end;
 $$;
 
@@ -298,7 +311,8 @@ as $$
     'surveys', coalesce((select jsonb_agg(to_jsonb(t) - '__position' order by t.__position) from public.surveys t), '[]'::jsonb),
     'surveyResponses', coalesce((select jsonb_agg(to_jsonb(t) - '__position' order by t.__position) from public.survey_responses t), '[]'::jsonb),
     'systemSettings', (select data from public.system_settings where id = 'default'),
-    'currentTheme', (select data from public.website_themes where id = 'default'),
+    'currentTheme', coalesce((select data from public.website_themes where id = 'default'), '{}'::jsonb),
+    'websiteThemes', coalesce((select data from public.website_themes where id = 'default'), '{}'::jsonb),
     'themePersistenceReady', to_regprocedure('public.save_website_theme(jsonb,jsonb)') is not null
   );
 $$;

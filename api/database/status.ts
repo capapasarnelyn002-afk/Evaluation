@@ -1,8 +1,8 @@
 import type { Request, Response } from 'express';
 
 function getSupabaseCredentials() {
-  const projectUrl = process.env.SUPABASE_URL?.replace(/\/+$/, '');
-  const apiKey = process.env.SUPABASE_SECRET_KEY;
+  const projectUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL)?.replace(/\/+$/, '');
+  const apiKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_SECRET;
 
   if (!projectUrl || !apiKey) return null;
 
