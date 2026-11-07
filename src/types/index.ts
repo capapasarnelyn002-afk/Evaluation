@@ -221,6 +221,41 @@ export interface LogoHistoryItem {
   sizeBytes?: number;
 }
 
+export type ManagedContentType =
+  | 'text'
+  | 'heading'
+  | 'paragraph'
+  | 'image'
+  | 'card'
+  | 'announcement'
+  | 'button'
+  | 'link'
+  | 'divider'
+  | 'two-column'
+  | 'three-column'
+  | 'footer-column'
+  | 'contact'
+  | 'social';
+
+export interface ManagedContentBlock {
+  id: string;
+  type: ManagedContentType;
+  title?: string;
+  body?: string;
+  imageUrl?: string;
+  linkUrl?: string;
+  buttonLabel?: string;
+  visible: boolean;
+  alignment?: 'left' | 'center' | 'right';
+  backgroundColor?: string;
+  textColor?: string;
+  borderColor?: string;
+  fontSize?: string;
+  padding?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface WebsiteTheme {
   siteName: string;
   siteTagline: string;
@@ -274,6 +309,8 @@ export interface WebsiteTheme {
   footerSubtitle?: string;
   footerLogoVisible?: boolean;
   footerLogoSize?: string;
+  footerContent?: ManagedContentBlock[];
+  pageContent?: Record<string, ManagedContentBlock[]>;
   buttonPrimaryBg: string;
   buttonPrimaryText: string;
   linkTextColor: string;
