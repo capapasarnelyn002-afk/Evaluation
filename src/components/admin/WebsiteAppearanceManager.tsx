@@ -362,6 +362,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sidebar' | 'typography' | 'colors'>('sidebar');
   const [logoSourceTab, setLogoSourceTab] = useState<'upload' | 'url' | 'preset'>('upload');
   const [contentPageKey, setContentPageKey] = useState('dashboard');
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   
   const [formTheme, setFormTheme] = useState<WebsiteTheme>({
     ...theme,
@@ -1929,15 +1930,28 @@ export const WebsiteAppearanceManager: React.FC = () => {
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setPreviewSidebarCollapsed(!previewSidebarCollapsed)}
-                  className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1 cursor-pointer"
-                  title="Toggle collapsed/expanded preview"
-                >
-                  {previewSidebarCollapsed ? <Maximize2 className="w-3 h-3" /> : <Minimize2 className="w-3 h-3" />}
-                  <span>{previewSidebarCollapsed ? 'Expanded View' : 'Collapsed View'}</span>
-                </button>
+                <div className="flex flex-wrap justify-end gap-1" role="group" aria-label="Preview device size">
+                  {(['desktop', 'tablet', 'mobile'] as const).map(device => (
+                    <button
+                      key={device}
+                      type="button"
+                      onClick={() => setPreviewDevice(device)}
+                      aria-pressed={previewDevice === device}
+                      className={`px-2 py-1 rounded-md text-[11px] font-semibold capitalize ${previewDevice === device ? 'bg-emerald-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                    >
+                      {device}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setPreviewSidebarCollapsed(!previewSidebarCollapsed)}
+                    className="px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1"
+                    title="Toggle collapsed/expanded preview"
+                  >
+                    {previewSidebarCollapsed ? <Maximize2 className="w-3 h-3" /> : <Minimize2 className="w-3 h-3" />}
+                    <span>{previewSidebarCollapsed ? 'Expand' : 'Collapse'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Simulated Sidebar Frame */}
@@ -1947,8 +1961,8 @@ export const WebsiteAppearanceManager: React.FC = () => {
                   backgroundColor: currentSidebarBg, 
                   color: currentSidebarTextColor,
                   borderColor: currentBorderColor,
-                  width: previewSidebarCollapsed ? '76px' : '100%',
-                  margin: previewSidebarCollapsed ? '0 auto' : '0'
+                  width: previewSidebarCollapsed ? '76px' : previewDevice === 'mobile' ? 'min(100%, 390px)' : previewDevice === 'tablet' ? 'min(100%, 768px)' : '100%',
+                  margin: '0 auto'
                 }}
               >
                 {/* Top Brand Header in Preview */}

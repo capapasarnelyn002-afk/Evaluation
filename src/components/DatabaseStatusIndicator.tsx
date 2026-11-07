@@ -6,9 +6,10 @@ type DatabaseStatus = 'checking' | 'connected' | 'disconnected';
 
 interface DatabaseStatusIndicatorProps {
   showHint?: boolean;
+  compact?: boolean;
 }
 
-export const DatabaseStatusIndicator: React.FC<DatabaseStatusIndicatorProps> = ({ showHint = false }) => {
+export const DatabaseStatusIndicator: React.FC<DatabaseStatusIndicatorProps> = ({ showHint = false, compact = false }) => {
   const [status, setStatus] = useState<DatabaseStatus>('checking');
   const [hint, setHint] = useState('');
 
@@ -50,6 +51,7 @@ export const DatabaseStatusIndicator: React.FC<DatabaseStatusIndicatorProps> = (
       <div
         role="status"
         aria-live="polite"
+        aria-label={status === 'connected' ? 'Database connected' : status === 'disconnected' ? 'Database unavailable' : 'Checking database'}
         title={hint || (
           status === 'connected'
             ? 'Connected to the Supabase database'
@@ -73,7 +75,7 @@ export const DatabaseStatusIndicator: React.FC<DatabaseStatusIndicatorProps> = (
           <LoaderCircle className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
         )}
         <Database className="w-3.5 h-3.5" aria-hidden="true" />
-        <span>
+        <span className={compact ? 'hidden sm:inline' : undefined}>
           {status === 'connected'
             ? 'Database connected'
             : status === 'disconnected'

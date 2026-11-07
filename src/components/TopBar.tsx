@@ -64,13 +64,13 @@ export const TopBar: React.FC = () => {
     >
       {headerVisible && (
         <div
-          className="px-4 sm:px-6 text-xs flex items-center justify-between border-b"
+          className="min-h-12 px-3 sm:px-6 text-xs flex flex-wrap items-center justify-between gap-y-2 border-b"
           style={{
             backgroundColor: headerBg,
             color: headerText,
             borderColor: theme.headerBorderColor || 'rgba(255,255,255,0.12)',
             minHeight: headerHeight,
-            height: headerHeight,
+            height: 'auto',
             padding: headerPadding,
             fontFamily: theme.headerFontFamily || 'Inter, system-ui, sans-serif',
             fontSize: theme.headerFontSize || '0.75rem',
@@ -78,7 +78,7 @@ export const TopBar: React.FC = () => {
             letterSpacing: '0.01em'
           }}
         >
-          <div className="flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap" />
+          <div className="min-w-0 flex-1" />
           <div className="flex items-center gap-3 shrink-0 text-[11px]">
             <button
               type="button"
@@ -93,33 +93,33 @@ export const TopBar: React.FC = () => {
       )}
 
       {/* Main Top Bar */}
-      <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-4" style={{ minHeight: headerVisible ? 'auto' : '52px' }}>
+      <div className="px-3 sm:px-6 py-2 sm:py-3 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-3 gap-y-2" style={{ minHeight: headerVisible ? 'auto' : '52px' }}>
         
         {/* Left: Mobile Toggle & Page Title */}
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="md:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="lg:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
             aria-label="Open sidebar menu"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="truncate">
-            <div className="flex items-center gap-1 text-[11px] text-slate-400 capitalize">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1 text-[11px] text-slate-400 capitalize flex-wrap">
               <span>{role} Portal</span>
               <ChevronRight className="w-3 h-3 text-slate-300" />
               <span className="text-slate-600 font-medium">{currentView.replace('_', ' ')}</span>
             </div>
-            <h1 className="text-sm sm:text-base font-bold text-slate-900 truncate tracking-tight">
+            <h1 className="text-sm sm:text-base font-bold text-slate-900 line-clamp-2 break-words">
               {getViewTitle()}
             </h1>
           </div>
         </div>
 
         {/* Right action controls: network mode and offline sync */}
-        <div className="flex items-center gap-2 shrink-0">
-          <DatabaseStatusIndicator />
+        <div className="flex w-full sm:w-auto items-center justify-end gap-2 shrink-0 flex-wrap">
+          <DatabaseStatusIndicator compact />
           
           {/* Offline/Online Network Indicator Button */}
           <button

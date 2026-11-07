@@ -151,11 +151,11 @@ export const Sidebar: React.FC = () => {
 
   const sidebarContent = (
     <div 
-      className="h-full flex flex-col justify-between text-slate-800 border-r select-none"
+      className="h-full min-h-0 flex flex-col text-slate-800 border-r select-none"
       style={{ backgroundColor: theme.sidebarBgColor, color: theme.sidebarTextColor, borderColor: sidebarBorder }}
     >
       {/* Top Brand Header */}
-      <div>
+      <div className="flex min-h-0 flex-1 flex-col">
         <div className={`h-16 flex items-center border-b ${sidebarCollapsed ? 'justify-center px-2 relative' : 'justify-between px-4'}`} style={{ borderColor: sidebarBorder }}>
           {sidebarCollapsed ? (
             <div className="relative flex items-center justify-center">
@@ -199,7 +199,7 @@ export const Sidebar: React.FC = () => {
               {/* Desktop Collapse Toggle */}
               <button
                 onClick={() => setSidebarCollapsed(true)}
-                className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
                 title="Collapse sidebar"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -210,7 +210,7 @@ export const Sidebar: React.FC = () => {
           {/* Mobile Close Toggle */}
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -240,7 +240,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Main Navigation List */}
-        <nav className="p-2 space-y-1 mt-2 overflow-y-auto max-h-[calc(100vh-280px)]">
+        <nav className="min-h-0 flex-1 p-2 space-y-1 mt-2 overflow-y-auto overscroll-contain">
           {navItems.map((item) => {
             const isActive = currentView === item.id;
             return (
@@ -321,7 +321,7 @@ export const Sidebar: React.FC = () => {
     <>
       {/* Desktop Fixed Sidebar */}
       <aside 
-        className={`hidden md:block fixed top-0 left-0 h-screen z-30 transition-all duration-300 ${
+        className={`hidden lg:block fixed top-0 left-0 h-dvh z-30 transition-all duration-300 ${
           sidebarCollapsed ? 'w-20' : 'w-64'
         }`}
       >
@@ -330,12 +330,12 @@ export const Sidebar: React.FC = () => {
 
       {/* Mobile Drawer Backdrop & Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-50 flex">
           <div 
             className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="relative w-72 max-w-xs h-full bg-white shadow-2xl z-50">
+          <div className="relative w-80 max-w-[calc(100vw-2rem)] h-full bg-white shadow-2xl z-50">
             {sidebarContent}
           </div>
         </div>

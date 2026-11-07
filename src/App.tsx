@@ -101,21 +101,21 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100/70 text-slate-900 font-sans flex flex-col">
+    <div className="min-h-[100dvh] bg-slate-100/70 text-slate-900 font-sans flex flex-col overflow-x-clip">
       {/* Fixed Desktop Sidebar & Mobile Drawer */}
       <Sidebar />
 
       {/* Main Content Area Offset by Desktop Sidebar */}
       <div 
         className={`flex-1 flex flex-col transition-all duration-300 min-w-0 ${
-          sidebarCollapsed ? 'md:pl-20' : 'md:pl-64'
+          sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
         }`}
       >
         {/* Sticky Top Bar */}
         <TopBar />
 
         {/* Dashboard Content Container */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-16">
+        <main className="flex-1 min-w-0 p-3 sm:p-5 lg:p-8 max-w-7xl w-full mx-auto pb-16">
           {pageContentSections.length > 0 && (
             <div className="space-y-4 mb-6">
               {pageContentSections.map(([pageKey, blocks]) => (
