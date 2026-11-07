@@ -903,6 +903,61 @@ export const WebsiteAppearanceManager: React.FC = () => {
         </div>
       </div>
 
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Header & Footer Configuration</h3>
+            <p className="text-xs text-slate-500">Control the global top bar and footer colors, visibility, and spacing.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFormTheme(prev => ({ ...prev, headerEnabled: !(prev.headerEnabled ?? true) }))}
+              className="px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-50 text-[11px] font-semibold text-slate-700 cursor-pointer"
+            >
+              {formTheme.headerEnabled === false ? 'Enable Header' : 'Hide Header'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormTheme(prev => ({ ...prev, footerEnabled: !(prev.footerEnabled ?? true) }))}
+              className="px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-50 text-[11px] font-semibold text-slate-700 cursor-pointer"
+            >
+              {formTheme.footerEnabled === false ? 'Enable Footer' : 'Hide Footer'}
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-slate-700">Header Background</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={formTheme.headerBackgroundColor || formTheme.headerBgColor || '#022c22'} onChange={(e) => updateField('headerBackgroundColor', e.target.value)} className="w-10 h-9 rounded border border-slate-300 p-0.5" />
+              <input type="text" value={formTheme.headerBackgroundColor || formTheme.headerBgColor || '#022c22'} onChange={(e) => updateField('headerBackgroundColor', e.target.value)} className="flex-1 border border-slate-300 rounded-lg p-2 text-xs font-mono uppercase" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-slate-700">Header Text</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={formTheme.headerTextColor || '#ffffff'} onChange={(e) => updateField('headerTextColor', e.target.value)} className="w-10 h-9 rounded border border-slate-300 p-0.5" />
+              <input type="text" value={formTheme.headerTextColor || '#ffffff'} onChange={(e) => updateField('headerTextColor', e.target.value)} className="flex-1 border border-slate-300 rounded-lg p-2 text-xs font-mono uppercase" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-slate-700">Footer Background</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={formTheme.footerBackgroundColor || '#0f172a'} onChange={(e) => updateField('footerBackgroundColor', e.target.value)} className="w-10 h-9 rounded border border-slate-300 p-0.5" />
+              <input type="text" value={formTheme.footerBackgroundColor || '#0f172a'} onChange={(e) => updateField('footerBackgroundColor', e.target.value)} className="flex-1 border border-slate-300 rounded-lg p-2 text-xs font-mono uppercase" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-slate-700">Footer Text</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={formTheme.footerTextColor || '#cbd5e1'} onChange={(e) => updateField('footerTextColor', e.target.value)} className="w-10 h-9 rounded border border-slate-300 p-0.5" />
+              <input type="text" value={formTheme.footerTextColor || '#cbd5e1'} onChange={(e) => updateField('footerTextColor', e.target.value)} className="flex-1 border border-slate-300 rounded-lg p-2 text-xs font-mono uppercase" />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Navigation Tabs between Sidebar Configuration, Typography and Colors */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
         <button

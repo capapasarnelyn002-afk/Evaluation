@@ -48,43 +48,52 @@ export const TopBar: React.FC = () => {
     }
   };
 
-  return (
-    <header className="sticky top-0 z-20 bg-white border-b border-slate-200">
-      
-      {/* Top University Micro-Bar */}
-      <div 
-        className="px-4 sm:px-6 py-1.5 text-xs flex items-center justify-between border-b"
-        style={{ 
-          backgroundColor: theme.headerBgColor || '#022c22', 
-          color: theme.headerTextColor || '#ffffff',
-          borderColor: 'rgba(255,255,255,0.1)'
-        }}
-      >
-        <div className="flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap">
-          <span className="font-semibold tracking-wide shrink-0" style={{ color: theme.accentColor }}>
-            {theme.siteName || 'SOUTHERN LEYTE STATE UNIVERSITY'}
-          </span>
-          <span className="opacity-40 hidden sm:inline" aria-hidden="true">/</span>
-          <span className="opacity-90 hidden sm:inline truncate">
-            {theme.siteTagline || 'Hinunangan Campus • FCSIT Extension Services'}
-          </span>
-        </div>
+  const headerBg = theme.headerBackgroundColor || theme.headerBgColor || '#022c22';
+  const headerText = theme.headerTextColor || '#ffffff';
+  const headerVisible = theme.headerEnabled !== false;
+  const headerHeight = theme.headerHeight || '52px';
+  const headerPadding = theme.headerPadding || '0.5rem 1.5rem';
 
-        <div className="flex items-center gap-3 shrink-0 text-[11px]">
-          <button
-            onClick={() => setShowAboutModal(true)}
-            className="hover:opacity-100 opacity-90 transition-opacity cursor-pointer font-medium flex items-center gap-1"
-            style={{ color: theme.accentColor }}
-          >
-            <Award className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">BSIT Capstone Defense</span>
-            <span>May 2026</span>
-          </button>
+  return (
+    <header
+      className="sticky top-0 z-20 bg-white border-b border-slate-200"
+      style={{
+        borderRadius: theme.headerBorderRadius || '0px',
+        overflow: 'hidden'
+      }}
+    >
+      {headerVisible && (
+        <div
+          className="px-4 sm:px-6 text-xs flex items-center justify-between border-b"
+          style={{
+            backgroundColor: headerBg,
+            color: headerText,
+            borderColor: theme.headerBorderColor || 'rgba(255,255,255,0.12)',
+            minHeight: headerHeight,
+            height: headerHeight,
+            padding: headerPadding,
+            fontFamily: theme.headerFontFamily || 'Inter, system-ui, sans-serif',
+            fontSize: theme.headerFontSize || '0.75rem',
+            fontWeight: theme.headerFontWeight || 600,
+            letterSpacing: '0.01em'
+          }}
+        >
+          <div className="flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap" />
+          <div className="flex items-center gap-3 shrink-0 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setShowAboutModal(true)}
+              className="hover:opacity-100 opacity-90 transition-opacity cursor-pointer font-medium flex items-center gap-1"
+              style={{ color: theme.accentColor }}
+            >
+              <Award className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Top Bar */}
-      <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+      <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-4" style={{ minHeight: headerVisible ? 'auto' : '52px' }}>
         
         {/* Left: Mobile Toggle & Page Title */}
         <div className="flex items-center gap-3 min-w-0">

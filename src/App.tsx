@@ -21,7 +21,8 @@ const MainLayout: React.FC = () => {
     setLastSubmittedEvaluation, 
     activities,
     toasts,
-    dismissToast
+    dismissToast,
+    theme
   } = useApp();
 
   if (isAuthLoading || !isAuthenticated) {
@@ -70,35 +71,58 @@ const MainLayout: React.FC = () => {
         </main>
 
         {/* Institutional Footer */}
-        <footer className="bg-slate-900 text-slate-400 border-t border-slate-800 py-8 px-6 text-xs mt-auto">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-emerald-950 border border-emerald-800 flex items-center justify-center text-amber-400 font-bold shrink-0">
-                <Building2 className="w-4 h-4" />
+        {theme.footerEnabled !== false && (
+          <footer
+            className="border-t py-8 px-6 text-xs mt-auto"
+            style={{
+              backgroundColor: theme.footerBackgroundColor || '#0f172a',
+              color: theme.footerTextColor || '#cbd5e1',
+              borderColor: theme.footerBorderColor || '#1e293b',
+              fontFamily: theme.footerFontFamily || 'Inter, system-ui, sans-serif',
+              fontSize: theme.footerFontSize || '0.75rem',
+              fontWeight: theme.footerFontWeight || 500,
+              padding: theme.footerPadding || '2rem 1.5rem'
+            }}
+          >
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-3">
+                {theme.footerLogoVisible !== false && (
+                  <div
+                    className="rounded-lg border flex items-center justify-center text-amber-400 font-bold shrink-0"
+                    style={{
+                      width: theme.footerLogoSize || '32px',
+                      height: theme.footerLogoSize || '32px',
+                      backgroundColor: theme.primaryColor || '#022c22',
+                      borderColor: theme.secondaryColor || '#065f46'
+                    }}
+                  >
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                )}
+                <div>
+                  <p className="font-semibold text-white text-xs">
+                    {theme.footerTitle || 'Southern Leyte State University · Hinunangan Campus'}
+                  </p>
+                  <p style={{ color: theme.footerTextColor || '#cbd5e1' }} className="text-[11px] opacity-90">
+                    {theme.footerSubtitle || 'Faculty of Computer Studies and Information Technology (FCSIT)'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-white text-xs">
-                  Southern Leyte State University · Hinunangan Campus
-                </p>
-                <p className="text-slate-400 text-[11px]">
-                  Faculty of Computer Studies and Information Technology (FCSIT)
-                </p>
-              </div>
-            </div>
 
-            <div className="text-center md:text-right space-y-1">
-              <p className="font-medium text-slate-200">
-                Extension Services Evaluation System with Data Analytics
-              </p>
-              <p className="text-slate-400 text-[11px]">
-                Researchers: Barrot, S.A.C. · Capapas, A.T. · Tabugon, R.P. · Tibar, D.M.M. · May 2026
-              </p>
-              <p className="text-slate-500 text-[10px]">
-                Governed under Republic Act No. 10173 (Data Privacy Act of 2012)
-              </p>
+              <div className="text-center md:text-right space-y-1">
+                <p className="font-medium text-slate-200">
+                  Extension Services Evaluation System with Data Analytics
+                </p>
+                <p style={{ color: theme.footerTextColor || '#cbd5e1' }} className="text-[11px] opacity-90">
+                  Researchers: Barrot, S.A.C. · Capapas, A.T. · Tabugon, R.P. · Tibar, D.M.M. · May 2026
+                </p>
+                <p className="text-slate-500 text-[10px]">
+                  Governed under Republic Act No. 10173 (Data Privacy Act of 2012)
+                </p>
+              </div>
             </div>
-          </div>
-        </footer>
+          </footer>
+        )}
       </div>
 
       {/* Official Attendance & Evaluation Receipt Modal */}

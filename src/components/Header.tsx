@@ -29,24 +29,16 @@ export const Header: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
-      {/* Institutional Top Accent Strip */}
-      <div className="bg-emerald-950 px-4 sm:px-8 py-1.5 text-xs text-slate-300 flex items-center justify-between border-b border-emerald-900">
-        <div className="flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap">
-          <span className="font-semibold tracking-wide text-amber-400 shrink-0">SOUTHERN LEYTE STATE UNIVERSITY</span>
-          <span className="text-emerald-700 hidden sm:inline" aria-hidden="true">/</span>
-          <span className="text-slate-300 hidden sm:inline truncate">Hinunangan Campus • Faculty of Computer Studies & IT</span>
-        </div>
-        <div className="flex items-center gap-3 shrink-0 text-[11px]">
-          <button
-            onClick={() => setShowAboutModal(true)}
-            className="text-amber-300 hover:text-white transition-colors cursor-pointer font-medium flex items-center gap-1"
-          >
-            <Award className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">BSIT Capstone Defense</span>
-            <span>2026</span>
-          </button>
-        </div>
-      </div>
+      <div
+        className="border-b"
+        style={{
+          backgroundColor: theme.headerBackgroundColor || theme.headerBgColor || '#022c22',
+          color: theme.headerTextColor || '#ffffff',
+          borderColor: theme.headerBorderColor || 'rgba(255,255,255,0.12)',
+          minHeight: theme.headerHeight || '52px',
+          display: theme.headerEnabled === false ? 'none' : 'block'
+        }}
+      />
 
       {/* Main Top Bar (Strict 3-Zone Contract: Brand — Nav Links — Primary Action) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

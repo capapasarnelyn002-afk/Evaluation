@@ -70,8 +70,37 @@ export const DEFAULT_THEME: WebsiteTheme = {
   sidebarActiveItemBg: '#022c22',
   sidebarActiveItemText: '#ffffff',
   sidebarBorderColor: '#e2e8f0',
+  headerEnabled: true,
+  headerBackgroundColor: '#022c22',
   headerBgColor: '#022c22',
   headerTextColor: '#ffffff',
+  headerFontFamily: 'Inter, system-ui, sans-serif',
+  headerFontSize: '0.75rem',
+  headerFontWeight: 600,
+  headerHeight: '52px',
+  headerPadding: '0.5rem 1.5rem',
+  headerBorderColor: 'rgba(255,255,255,0.12)',
+  headerBorderRadius: '0px',
+  headerAlignment: 'space-between',
+  headerTitle: '',
+  headerSubtitle: '',
+  headerLogoVisible: true,
+  headerLogoSize: '18px',
+  headerLogoPosition: 'left',
+  footerEnabled: true,
+  footerBackgroundColor: '#0f172a',
+  footerTextColor: '#cbd5e1',
+  footerFontFamily: 'Inter, system-ui, sans-serif',
+  footerFontSize: '0.75rem',
+  footerFontWeight: 500,
+  footerHeight: 'auto',
+  footerPadding: '2rem 1.5rem',
+  footerBorderColor: '#1e293b',
+  footerAlignment: 'space-between',
+  footerTitle: 'Southern Leyte State University · Hinunangan Campus',
+  footerSubtitle: 'Faculty of Computer Studies and Information Technology (FCSIT)',
+  footerLogoVisible: true,
+  footerLogoSize: '32px',
   buttonPrimaryBg: '#064e3b',
   buttonPrimaryText: '#ffffff',
   linkTextColor: '#065f46',
@@ -262,8 +291,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     root.style.setProperty('--sidebar-active-bg', t.sidebarActiveItemBg || t.primaryColor);
     root.style.setProperty('--sidebar-active-text', t.sidebarActiveItemText || '#ffffff');
     root.style.setProperty('--sidebar-border', t.sidebarBorderColor || '#e2e8f0');
-    root.style.setProperty('--bg-header', t.headerBgColor);
-    root.style.setProperty('--text-header', t.headerTextColor);
+    root.style.setProperty('--bg-header', t.headerBackgroundColor || t.headerBgColor || '#022c22');
+    root.style.setProperty('--text-header', t.headerTextColor || '#ffffff');
+    root.style.setProperty('--header-bg', t.headerBackgroundColor || t.headerBgColor || '#022c22');
+    root.style.setProperty('--header-text', t.headerTextColor || '#ffffff');
+    root.style.setProperty('--header-font', t.headerFontFamily || 'Inter, system-ui, sans-serif');
+    root.style.setProperty('--header-font-size', t.headerFontSize || '0.75rem');
+    root.style.setProperty('--header-height', t.headerHeight || '52px');
+    root.style.setProperty('--header-padding', t.headerPadding || '0.5rem 1.5rem');
+    root.style.setProperty('--header-border', t.headerBorderColor || 'rgba(255,255,255,0.12)');
+    root.style.setProperty('--footer-bg', t.footerBackgroundColor || '#0f172a');
+    root.style.setProperty('--footer-text', t.footerTextColor || '#cbd5e1');
+    root.style.setProperty('--footer-font', t.footerFontFamily || 'Inter, system-ui, sans-serif');
+    root.style.setProperty('--footer-font-size', t.footerFontSize || '0.75rem');
+    root.style.setProperty('--footer-height', t.footerHeight || 'auto');
+    root.style.setProperty('--footer-padding', t.footerPadding || '2rem 1.5rem');
+    root.style.setProperty('--footer-border', t.footerBorderColor || '#1e293b');
     root.style.setProperty('--btn-primary-bg', t.buttonPrimaryBg);
     root.style.setProperty('--btn-primary-text', t.buttonPrimaryText);
     root.style.setProperty('--color-link', t.linkTextColor);
