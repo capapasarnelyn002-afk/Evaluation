@@ -97,16 +97,14 @@ export const DEFAULT_THEME: WebsiteTheme = {
   footerPadding: '2rem 1.5rem',
   footerBorderColor: '#1e293b',
   footerAlignment: 'space-between',
-  footerTitle: 'Southern Leyte State University · Hinunangan Campus',
-  footerSubtitle: 'Faculty of Computer Studies and Information Technology (FCSIT)',
+  footerTitle: '',
+  footerSubtitle: '',
   footerLogoVisible: true,
   footerLogoSize: '32px',
-  footerContent: [
-    { id: 'footer-institution', type: 'footer-column', title: 'Southern Leyte State University · Hinunangan Campus', body: 'Faculty of Computer Studies and Information Technology (FCSIT)', visible: true, alignment: 'left' },
-    { id: 'footer-system', type: 'footer-column', title: 'Extension Services Evaluation System with Data Analytics', body: 'Researchers: Barrot, S.A.C. · Capapas, A.T. · Tabugon, R.P. · Tibar, D.M.M. · May 2026', visible: true, alignment: 'right' },
-    { id: 'footer-privacy', type: 'text', body: 'Governed under Republic Act No. 10173 (Data Privacy Act of 2012)', visible: true, alignment: 'right' }
-  ],
-  pageContent: {},
+  footerContent: [],
+  pageContent: {
+    dashboard: []
+  },
   buttonPrimaryBg: '#064e3b',
   buttonPrimaryText: '#ffffff',
   linkTextColor: '#065f46',

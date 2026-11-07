@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DEFAULT_THEME, useApp } from '../../context/AppContext';
-import { WebsiteTheme, TypographySettings, LogoHistoryItem } from '../../types';
+import { WebsiteTheme, TypographySettings, LogoHistoryItem, ManagedContentBlock } from '../../types';
 import { 
   Palette, 
   RotateCcw, 
@@ -361,6 +361,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'sidebar' | 'typography' | 'colors'>('sidebar');
   const [logoSourceTab, setLogoSourceTab] = useState<'upload' | 'url' | 'preset'>('upload');
+  const [contentPageKey, setContentPageKey] = useState('dashboard');
   
   const [formTheme, setFormTheme] = useState<WebsiteTheme>({
     ...theme,
@@ -511,6 +512,61 @@ export const WebsiteAppearanceManager: React.FC = () => {
 
   const updateField = (field: keyof WebsiteTheme, val: any) => {
     setFormTheme(prev => ({ ...prev, [field]: val }));
+  };
+
+  const addManagedBlock = (scope: 'footer' | 'page') => {
+    const newBlock: ManagedContentBlock = {
+      id: `${scope}-${Date.now()}`,
+      type: 'text',
+      title: scope === 'footer' ? 'Footer section' : 'Page section',
+      body: 'Add your message here.',
+      visible: true,
+      alignment: 'left'
+    };
+
+    setFormTheme(prev => {
+      if (scope === 'footer') {
+        return { ...prev, footerContent: [...(prev.footerContent || []), newBlock] };
+      }
+
+      const nextPageContent = { ...(prev.pageContent || {}) };
+      const currentPageBlocks = Array.isArray(nextPageContent[contentPageKey]) ? nextPageContent[contentPageKey] : [];
+      nextPageContent[contentPageKey] = [...currentPageBlocks, newBlock];
+
+      return { ...prev, pageContent: nextPageContent };
+    });
+  };
+
+  const updateManagedBlock = (scope: 'footer' | 'page', blockId: string, field: 'title' | 'body' | 'type', value: string | ManagedContentBlock['type']) => {
+    setFormTheme(prev => {
+      const normalizedValue = field === 'type' ? value as ManagedContentBlock['type'] : value as string;
+
+      if (scope === 'footer') {
+        return {
+          ...prev,
+          footerContent: (prev.footerContent || []).map(block => block.id === blockId ? { ...block, [field]: normalizedValue } : block)
+        };
+      }
+
+      const nextPageContent = { ...(prev.pageContent || {}) };
+      const pageKey = contentPageKey || 'dashboard';
+      nextPageContent[pageKey] = (nextPageContent[pageKey] || []).map(block => block.id === blockId ? { ...block, [field]: normalizedValue } : block);
+
+      return { ...prev, pageContent: nextPageContent };
+    });
+  };
+
+  const removeManagedBlock = (scope: 'footer' | 'page', blockId: string) => {
+    setFormTheme(prev => {
+      if (scope === 'footer') {
+        return { ...prev, footerContent: (prev.footerContent || []).filter(block => block.id !== blockId) };
+      }
+
+      const nextPageContent = { ...(prev.pageContent || {}) };
+      const pageKey = contentPageKey || 'dashboard';
+      nextPageContent[pageKey] = (nextPageContent[pageKey] || []).filter(block => block.id !== blockId);
+      return { ...prev, pageContent: nextPageContent };
+    });
   };
 
   const updateTypoField = (field: keyof TypographySettings, val: number) => {
@@ -900,6 +956,79 @@ export const WebsiteAppearanceManager: React.FC = () => {
             <Save className="w-4 h-4" />
             <span>{isSaving ? 'Saving System-Wide...' : 'Save Changes'}</span>
           </button>
+        </div>
+      </div>
+
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+        <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-100">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Footer & page content manager</h3>
+            <p className="text-xs text-slate-500">This content is stored in the database and displayed throughout the application.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => addManagedBlock('footer')} className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold">Add footer block</button>
+            <button type="button" onClick={() => addManagedBlock('page')} className="px-3 py-1.5 rounded-lg bg-emerald-900 text-white text-[11px] font-semibold">Add page block</button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wide text-slate-600">Footer blocks</h4>
+            {(formTheme.footerContent || []).length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500">
+                No footer blocks yet. Add a block to manage the institution footer text.
+              </div>
+            ) : (
+              (formTheme.footerContent || []).map((block) => (
+                <div key={block.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <select value={block.type || 'text'} onChange={(e) => updateManagedBlock('footer', block.id, 'type', e.target.value)} className="w-36 border border-slate-300 rounded-md px-2 py-1 text-[11px] bg-white">
+                      <option value="text">Text</option>
+                      <option value="heading">Heading</option>
+                      <option value="footer-column">Column</option>
+                    </select>
+                    <button type="button" onClick={() => removeManagedBlock('footer', block.id)} className="text-red-600 text-[11px] font-semibold">Remove</button>
+                  </div>
+                  <input value={block.title || ''} onChange={(e) => updateManagedBlock('footer', block.id, 'title', e.target.value)} placeholder="Title" className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white" />
+                  <textarea value={block.body || ''} onChange={(e) => updateManagedBlock('footer', block.id, 'body', e.target.value)} placeholder="Body text" className="w-full min-h-[72px] border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white" />
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-xs font-bold uppercase tracking-wide text-slate-600">Page content blocks</h4>
+              <select value={contentPageKey} onChange={(e) => setContentPageKey(e.target.value)} className="border border-slate-300 rounded-md px-2 py-1 text-[11px] bg-white">
+                <option value="dashboard">Dashboard</option>
+                <option value="home">Home</option>
+                <option value="participant">Participant</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+
+            {((formTheme.pageContent || {})[contentPageKey] || []).length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500">
+                No content blocks for this page yet. Add a page block to manage visible content.
+              </div>
+            ) : (
+              ((formTheme.pageContent || {})[contentPageKey] || []).map((block) => (
+                <div key={block.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <select value={block.type || 'text'} onChange={(e) => updateManagedBlock('page', block.id, 'type', e.target.value)} className="w-36 border border-slate-300 rounded-md px-2 py-1 text-[11px] bg-white">
+                      <option value="text">Text</option>
+                      <option value="heading">Heading</option>
+                      <option value="paragraph">Paragraph</option>
+                      <option value="announcement">Announcement</option>
+                    </select>
+                    <button type="button" onClick={() => removeManagedBlock('page', block.id)} className="text-red-600 text-[11px] font-semibold">Remove</button>
+                  </div>
+                  <input value={block.title || ''} onChange={(e) => updateManagedBlock('page', block.id, 'title', e.target.value)} placeholder="Section title" className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white" />
+                  <textarea value={block.body || ''} onChange={(e) => updateManagedBlock('page', block.id, 'body', e.target.value)} placeholder="Section content" className="w-full min-h-[72px] border border-slate-300 rounded-md px-2 py-1.5 text-xs bg-white" />
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 

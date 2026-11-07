@@ -128,7 +128,7 @@ export const AdminDashboardView: React.FC = () => {
   const detractors = evaluations.filter(e => e.meanRating < 3.5).length;
   const netSatisfactionScore = totalEvals > 0
     ? Math.round(((promoters - detractors) / totalEvals) * 100)
-    : 85;
+    : 0;
 
   const offlineCount = evaluations.filter(e => e.submissionSource === 'offline_synced').length;
   const onlineCount = evaluations.filter(e => e.submissionSource === 'online').length;
