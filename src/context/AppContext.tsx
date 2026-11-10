@@ -276,6 +276,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loginError, setLoginError] = useState('');
 
   const role = currentUser.role;
+  const authAttempt = React.useRef(0);
   const isAuthenticatedRef = React.useRef(isAuthenticated);
   isAuthenticatedRef.current = isAuthenticated;
 
@@ -448,6 +449,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loginWithEmail = async (email: string, password: string): Promise<boolean> => {
+    const attemptId = ++authAttempt.current;
+    setIsAuthLoading(false);
     setLoginError('');
     try {
       const res = await apiFetch('/api/auth/login', {
@@ -458,6 +461,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       if (res.ok) {
         const data = await res.json();
+        if (attemptId !== authAttempt.current) return false;
         setCurrentUser(data.user);
         localStorage.setItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY, data.token);
         setIsAuthenticated(true);
@@ -470,6 +474,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return true;
       } else {
         const err = await res.json();
+        if (attemptId !== authAttempt.current) return false;
         setLoginError(err.error || 'Invalid email or password.');
         addToast({
           type: 'error',
@@ -479,6 +484,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
       }
     } catch {
+      if (attemptId !== authAttempt.current) return false;
       const message = 'The authentication service is unavailable.';
       setLoginError(message);
       addToast({ type: 'error', title: 'Sign In Failed', description: message });
@@ -487,6 +493,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loginWithGoogle = async (): Promise<string | null> => {
+    authAttempt.current += 1;
+    setIsAuthLoading(false);
     setLoginError('');
     if (!supabase) {
       const message = 'Google sign-in is not configured. Set the public Supabase URL and publishable key.';
@@ -517,6 +525,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = async () => {
+    authAttempt.current += 1;
     const token = localStorage.getItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
     localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
     sessionStorage.removeItem('slsu_google_oauth_pending');
@@ -1168,23 +1177,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sessionStorage.removeItem('slsu_google_oauth_pending');
     const token = localStorage.getItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
     if (token) {
+      const attemptId = authAttempt.current;
       apiFetch('/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(10_000)
       })
         .then(async res => {
+          if (attemptId !== authAttempt.current) return;
           if (!res.ok) throw new Error('Stored sign-in session is no longer valid.');
           const data = await res.json();
+          if (attemptId !== authAttempt.current) return;
           setCurrentUser(data.user);
           setIsAuthenticated(true);
         })
         .catch((error: unknown) => {
+          if (attemptId !== authAttempt.current) return;
           localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
           if (error instanceof Error) {
             addToast({ type: 'info', title: 'Sign In Required', description: error.message });
           }
         })
-        .finally(() => setIsAuthLoading(false));
+        .finally(() => {
+          if (attemptId === authAttempt.current) setIsAuthLoading(false);
+        });
     } else {
       setIsAuthLoading(false);
     }
@@ -1206,6 +1221,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const authClient = supabase;
     if (!authClient || sessionStorage.getItem('slsu_google_oauth_pending') !== 'true') return;
     sessionStorage.removeItem('slsu_google_oauth_pending');
+    const attemptId = authAttempt.current;
     let active = true;
 
     const finishGoogleSignIn = async () => {
@@ -1222,24 +1238,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           signal: AbortSignal.timeout(10_000)
         });
         const result = await response.json() as { user?: UserAccount; error?: string };
+        if (attemptId !== authAttempt.current) return;
         if (!response.ok || !result.user) {
           localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
           await authClient.auth.signOut();
           throw new Error(result.error || 'This Google account is not authorized for the application.');
         }
 
-        if (!active) return;
+        if (!active || attemptId !== authAttempt.current) return;
         setCurrentUser(result.user);
         setIsAuthenticated(true);
         setCurrentView('overview');
         setLoginError('');
       } catch (error) {
-        localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
-        if (active) {
+        if (active && attemptId === authAttempt.current) {
+          localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
           setLoginError(error instanceof Error ? error.message : 'Google sign-in failed. Please try again.');
         }
       } finally {
-        if (active) setIsAuthLoading(false);
+        if (active && attemptId === authAttempt.current) setIsAuthLoading(false);
       }
     };
 

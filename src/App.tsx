@@ -62,7 +62,6 @@ const MainLayout: React.FC = () => {
   const { 
     role, 
     isAuthenticated,
-    isAuthLoading,
     sidebarCollapsed,
     lastSubmittedEvaluation, 
     setLastSubmittedEvaluation, 
@@ -72,14 +71,10 @@ const MainLayout: React.FC = () => {
     theme
   } = useApp();
 
-  if (isAuthLoading || !isAuthenticated) {
+  if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#F5F8FC] flex items-center justify-center">
-        {isAuthLoading ? (
-          <p className="text-sm text-slate-600">Checking sign-in session...</p>
-        ) : (
-          <LoginModal />
-        )}
+      <div className="min-h-screen bg-[#F5F8FC]">
+        <LoginModal />
       </div>
     );
   }

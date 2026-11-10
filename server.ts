@@ -1145,9 +1145,9 @@ app.get('/api/participant/evaluations', (req, res) => {
 // ==========================================
 app.get('/api/settings', async (_req, res) => {
   try {
-    const configuration = await loadApplicationConfiguration();
-    systemSettings = configuration.systemSettings;
-    setConfigurationHeaders(res, configuration.systemSettingsVersion, configuration.systemSettingsUpdatedAt);
+    const configuration = await loadSystemSettingsConfiguration();
+    systemSettings = configuration.data;
+    setConfigurationHeaders(res, configuration.version, configuration.updatedAt);
     return res.json(systemSettings);
   } catch (error) {
     console.error('Failed to load institutional settings:', error);
@@ -1173,8 +1173,8 @@ app.patch('/api/settings', async (req, res) => {
   if (expectedVersion === null) return;
 
   try {
-    const configuration = await loadApplicationConfiguration();
-    const nextSettings = { ...configuration.systemSettings, ...req.body };
+    const configuration = await loadSystemSettingsConfiguration();
+    const nextSettings = { ...configuration.data, ...req.body };
     const auditLog = {
       id: `log-${randomUUID()}`,
       timestamp: new Date().toISOString(),
@@ -1958,11 +1958,11 @@ const isValidColor = (val: unknown) =>
 
 app.get('/api/public/config', async (_req, res) => {
   try {
-    const configuration = await loadApplicationConfiguration();
+    const configuration = await loadThemeConfiguration();
     return res.json({
-      theme: configuration.theme,
-      version: configuration.themeVersion,
-      updatedAt: configuration.themeUpdatedAt
+      theme: migrateLegacyTheme(configuration.data as Record<string, unknown>),
+      version: configuration.version,
+      updatedAt: configuration.updatedAt
     });
   } catch (error) {
     console.error('Failed to load public website configuration:', error);
@@ -1972,9 +1972,9 @@ app.get('/api/public/config', async (_req, res) => {
 
 app.get('/api/theme', async (_req, res) => {
   try {
-    const configuration = await loadApplicationConfiguration();
-    currentTheme = configuration.theme;
-    setConfigurationHeaders(res, configuration.themeVersion, configuration.themeUpdatedAt);
+    const configuration = await loadThemeConfiguration();
+    currentTheme = migrateLegacyTheme(configuration.data as Record<string, unknown>);
+    setConfigurationHeaders(res, configuration.version, configuration.updatedAt);
     return res.json(currentTheme);
   } catch (error) {
     console.error('Failed to load website appearance:', error);
@@ -2011,8 +2011,8 @@ app.post('/api/theme', async (req, res) => {
   }
 
   try {
-    const configuration = await loadApplicationConfiguration();
-    currentTheme = configuration.theme;
+    const configuration = await loadThemeConfiguration();
+    currentTheme = migrateLegacyTheme(configuration.data as Record<string, unknown>);
     const requestTheme = { ...req.body };
     if (requestTheme.typography) {
       const typo = requestTheme.typography;
@@ -2440,8 +2440,8 @@ async function loadConfigurationRow<T extends object>(
 
 async function loadApplicationConfiguration() {
   const [theme, settings] = await Promise.all([
-    loadConfigurationRow('website_themes', currentTheme),
-    loadConfigurationRow('system_settings', systemSettings)
+    loadThemeConfiguration(),
+    loadSystemSettingsConfiguration()
   ]);
   return {
     theme: migrateLegacyTheme(theme.data as Record<string, unknown>),
@@ -2451,6 +2451,14 @@ async function loadApplicationConfiguration() {
     systemSettingsVersion: settings.version,
     systemSettingsUpdatedAt: settings.updatedAt
   };
+}
+
+function loadThemeConfiguration() {
+  return loadConfigurationRow('website_themes', currentTheme);
+}
+
+function loadSystemSettingsConfiguration() {
+  return loadConfigurationRow('system_settings', systemSettings);
 }
 
 function setConfigurationHeaders(res: express.Response, version: number, updatedAt: string) {
