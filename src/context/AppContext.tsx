@@ -220,6 +220,32 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_QUEUE_KEY = 'slsu_ext_offline_queue_v1';
 const LOCAL_STORAGE_ACCESS_TOKEN_KEY = 'slsu_ext_access_token_v1';
+const LOCAL_STORAGE_CONFIGURATION_KEY = 'slsu_ext_saved_configuration_v1';
+
+type CachedConfiguration = {
+  theme: WebsiteTheme;
+  themeVersion: number;
+  systemSettings?: SystemSettings;
+  systemSettingsVersion?: number;
+};
+
+function readCachedConfiguration(): CachedConfiguration | null {
+  try {
+    const stored = localStorage.getItem(LOCAL_STORAGE_CONFIGURATION_KEY);
+    if (!stored) return null;
+    const cached = JSON.parse(stored) as Partial<CachedConfiguration>;
+    if (
+      !cached.theme ||
+      typeof cached.theme.siteName !== 'string' ||
+      typeof cached.theme.primaryColor !== 'string' ||
+      !Number.isSafeInteger(cached.themeVersion) ||
+      cached.themeVersion! < 0
+    ) return null;
+    return cached as CachedConfiguration;
+  } catch {
+    return null;
+  }
+}
 
 async function getApiError(response: Response, fallback: string): Promise<string> {
   const body = await response.json().catch(() => null) as { error?: unknown } | null;
@@ -227,6 +253,7 @@ async function getApiError(response: Response, fallback: string): Promise<string
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const cachedConfiguration = React.useMemo(readCachedConfiguration, []);
   const [currentUser, setCurrentUser] = useState<UserAccount>({
     id: '',
     name: '',
@@ -236,15 +263,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [isConfigurationLoading, setIsConfigurationLoading] = useState(true);
+  const [isConfigurationLoading, setIsConfigurationLoading] = useState(false);
   const [configurationError, setConfigurationError] = useState('');
-  const configurationLoaded = React.useRef(false);
+  const configurationLoaded = React.useRef(Boolean(cachedConfiguration));
   const configurationRequestId = React.useRef(0);
-  const themeVersion = React.useRef(0);
-  const systemSettingsVersion = React.useRef(0);
+  const configurationRequest = React.useRef<{ includesSettings: boolean; promise: Promise<void> } | null>(null);
+  const configurationCache = React.useRef<CachedConfiguration | null>(cachedConfiguration);
+  const themeVersion = React.useRef(cachedConfiguration?.themeVersion || 0);
+  const systemSettingsVersion = React.useRef(cachedConfiguration?.systemSettingsVersion || 0);
+  const themeLoadedFromServer = React.useRef(false);
+  const systemSettingsLoadedFromServer = React.useRef(false);
   const [loginError, setLoginError] = useState('');
 
   const role = currentUser.role;
+  const isAuthenticatedRef = React.useRef(isAuthenticated);
+  isAuthenticatedRef.current = isAuthenticated;
 
   // Navigation layout state
   const [currentView, setCurrentViewState] = useState<string>('overview');
@@ -274,7 +307,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [users, setUsers] = useState<UserAccount[]>([]);
 
   // System Settings
-  const [systemSettings, setSystemSettings] = useState<SystemSettings>({
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>(cachedConfiguration?.systemSettings || {
     institutionName: 'Southern Leyte State University - Hinunangan Campus',
     campusCode: 'SLSU-HIN',
     leadDepartment: 'Faculty of Computer Studies and Information Technology (FCSIT)',
@@ -287,7 +320,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   // Website Theme Customization
-  const [theme, setTheme] = useState<WebsiteTheme>(DEFAULT_THEME);
+  const [theme, setTheme] = useState<WebsiteTheme>(cachedConfiguration?.theme || DEFAULT_THEME);
 
   // Data collections
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -420,15 +453,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
+        signal: AbortSignal.timeout(10_000)
       });
       if (res.ok) {
         const data = await res.json();
         setCurrentUser(data.user);
         localStorage.setItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY, data.token);
-        configurationLoaded.current = false;
-        setConfigurationError('');
-        setIsConfigurationLoading(true);
         setIsAuthenticated(true);
         setCurrentView('overview');
         addToast({
@@ -487,6 +518,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logout = async () => {
     const token = localStorage.getItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem('slsu_google_oauth_pending');
+    setCurrentUser({ id: '', name: '', email: '', role: 'participant', status: 'inactive' });
+    setIsAuthenticated(false);
     let hasOAuthSession = false;
     if (supabase) {
       try {
@@ -511,9 +546,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
-    configurationLoaded.current = false;
-    setConfigurationError('');
-    setIsConfigurationLoading(true);
     setCurrentUser({ id: '', name: '', email: '', role: 'participant', status: 'inactive' });
     setIsAuthenticated(false);
     setUsers([]);
@@ -820,66 +852,112 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
-  const refreshConfiguration = async () => {
-    const requestId = ++configurationRequestId.current;
-    const blockUntilLoaded = !configurationLoaded.current || (isAuthenticated && systemSettingsVersion.current === 0);
-    if (blockUntilLoaded) {
-      setIsConfigurationLoading(true);
-      setConfigurationError('');
+  const refreshConfiguration = (): Promise<void> => {
+    const includeSettings = isAuthenticated;
+    const activeRequest = configurationRequest.current;
+    if (activeRequest) {
+      if (includeSettings && !activeRequest.includesSettings) {
+        return activeRequest.promise.then(() =>
+          isAuthenticatedRef.current ? refreshConfiguration() : undefined
+        );
+      }
+      return activeRequest.promise;
     }
 
-    try {
-      const [themeResponse, settingsResponse] = await Promise.all([
-        apiFetch('/api/public/config', { cache: 'no-store' }),
-        isAuthenticated
-          ? apiFetch('/api/settings', { cache: 'no-store' })
-          : Promise.resolve(null)
-      ]);
-      if (!themeResponse.ok) throw new Error(await getApiError(themeResponse, 'The saved website configuration could not be loaded.'));
+    const requestId = ++configurationRequestId.current;
+    setIsConfigurationLoading(true);
+    setConfigurationError('');
 
-      const result = await themeResponse.json() as { theme?: unknown; version?: unknown };
-      if (
-        !result.theme ||
-        typeof result.theme !== 'object' ||
-        typeof (result.theme as WebsiteTheme).siteName !== 'string' ||
-        typeof (result.theme as WebsiteTheme).primaryColor !== 'string' ||
-        !Number.isSafeInteger(result.version)
-      ) {
-        throw new Error('The saved website configuration is invalid.');
-      }
-      const receivedThemeVersion = result.version as number;
-      if (receivedThemeVersion > themeVersion.current) {
-        const loadedTheme = result.theme as WebsiteTheme;
-        themeVersion.current = receivedThemeVersion;
-        setTheme(loadedTheme);
-        applyThemeToDOM(loadedTheme);
-      }
+    let request: Promise<void> = Promise.resolve();
+    request = (async () => {
+      try {
+        const signal = AbortSignal.timeout(10_000);
+        const [themeResponse, settingsResponse] = await Promise.all([
+          apiFetch('/api/public/config', { cache: 'no-store', signal }),
+          includeSettings
+            ? apiFetch('/api/settings', { cache: 'no-store', signal })
+            : Promise.resolve(null)
+        ]);
+        if (!themeResponse.ok) throw new Error(await getApiError(themeResponse, 'The saved website configuration could not be loaded.'));
 
-      if (settingsResponse) {
-        if (!settingsResponse.ok) throw new Error(await getApiError(settingsResponse, 'Institutional settings could not be loaded.'));
-        const receivedSettingsVersion = Number(settingsResponse.headers.get('X-Configuration-Version'));
-        const loadedSettings = await settingsResponse.json() as SystemSettings;
-        if (!Number.isSafeInteger(receivedSettingsVersion) || !loadedSettings || typeof loadedSettings !== 'object') {
-          throw new Error('The saved institutional settings are invalid.');
+        const result = await themeResponse.json() as { theme?: unknown; version?: unknown };
+        if (
+          !result.theme ||
+          typeof result.theme !== 'object' ||
+          typeof (result.theme as WebsiteTheme).siteName !== 'string' ||
+          typeof (result.theme as WebsiteTheme).primaryColor !== 'string' ||
+          !Number.isSafeInteger(result.version)
+        ) {
+          throw new Error('The saved website configuration is invalid.');
         }
-        if (receivedSettingsVersion > systemSettingsVersion.current) {
-          systemSettingsVersion.current = receivedSettingsVersion;
-          setSystemSettings(loadedSettings);
+        const receivedThemeVersion = result.version as number;
+        if (!themeLoadedFromServer.current || receivedThemeVersion >= themeVersion.current) {
+          const loadedTheme = result.theme as WebsiteTheme;
+          themeVersion.current = receivedThemeVersion;
+          setTheme(loadedTheme);
+          applyThemeToDOM(loadedTheme);
+          configurationCache.current = {
+            ...configurationCache.current,
+            theme: loadedTheme,
+            themeVersion: receivedThemeVersion
+          };
         }
-      }
+        themeLoadedFromServer.current = true;
 
-      if (requestId === configurationRequestId.current) {
+        if (settingsResponse) {
+          if (!settingsResponse.ok) throw new Error(await getApiError(settingsResponse, 'Institutional settings could not be loaded.'));
+          const receivedSettingsVersion = Number(settingsResponse.headers.get('X-Configuration-Version'));
+          const loadedSettings = await settingsResponse.json() as SystemSettings;
+          if (!Number.isSafeInteger(receivedSettingsVersion) || !loadedSettings || typeof loadedSettings !== 'object') {
+            throw new Error('The saved institutional settings are invalid.');
+          }
+          if (!systemSettingsLoadedFromServer.current || receivedSettingsVersion >= systemSettingsVersion.current) {
+            systemSettingsVersion.current = receivedSettingsVersion;
+            setSystemSettings(loadedSettings);
+            configurationCache.current = {
+              ...(configurationCache.current || {
+                theme: theme,
+                themeVersion: themeVersion.current
+              }),
+              systemSettings: loadedSettings,
+              systemSettingsVersion: receivedSettingsVersion
+            };
+          }
+          systemSettingsLoadedFromServer.current = true;
+        }
+
+        if (configurationCache.current) {
+          try {
+            localStorage.setItem(LOCAL_STORAGE_CONFIGURATION_KEY, JSON.stringify(configurationCache.current));
+          } catch (error) {
+            console.warn('Could not cache the saved configuration in this browser.', error);
+          }
+        }
         configurationLoaded.current = true;
-        setConfigurationError('');
-        setIsConfigurationLoading(false);
+        if (requestId === configurationRequestId.current) setConfigurationError('');
+      } catch (error) {
+        const message = error instanceof Error && error.name === 'TimeoutError'
+          ? 'Configuration refresh timed out. Your current settings are still available.'
+          : error instanceof Error
+            ? error.message
+            : 'The saved configuration could not be loaded.';
+        console.error('Failed to load the latest saved configuration:', error);
+        if (requestId === configurationRequestId.current) setConfigurationError(message);
+      } finally {
+        if (requestId === configurationRequestId.current) setIsConfigurationLoading(false);
+        if (configurationRequest.current?.promise === request) configurationRequest.current = null;
       }
+    })();
+    configurationRequest.current = { includesSettings: includeSettings, promise: request };
+    return request;
+  };
+
+  const persistConfigurationCache = () => {
+    if (!configurationCache.current) return;
+    try {
+      localStorage.setItem(LOCAL_STORAGE_CONFIGURATION_KEY, JSON.stringify(configurationCache.current));
     } catch (error) {
-      console.error('Failed to load the latest saved configuration:', error);
-      if (blockUntilLoaded && requestId === configurationRequestId.current) {
-        setConfigurationError(error instanceof Error ? error.message : 'The saved configuration could not be loaded.');
-      }
-    } finally {
-      if (blockUntilLoaded && requestId === configurationRequestId.current) setIsConfigurationLoading(false);
+      console.warn('Could not cache the saved configuration in this browser.', error);
     }
   };
 
@@ -900,10 +978,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const savedTheme = await res.json() as WebsiteTheme;
       const savedVersion = Number(res.headers.get('X-Configuration-Version'));
       if (!Number.isSafeInteger(savedVersion)) throw new Error('The database saved the appearance but returned an invalid version.');
+      themeLoadedFromServer.current = true;
       if (savedVersion > themeVersion.current) {
         themeVersion.current = savedVersion;
         setTheme(savedTheme);
         applyThemeToDOM(savedTheme);
+        configurationCache.current = {
+          ...(configurationCache.current || { theme: savedTheme, themeVersion: savedVersion }),
+          theme: savedTheme,
+          themeVersion: savedVersion
+        };
+        persistConfigurationCache();
       }
       if (showToast) {
         addToast({
@@ -938,10 +1023,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const savedTheme = await res.json() as WebsiteTheme;
       const savedVersion = Number(res.headers.get('X-Configuration-Version'));
       if (!Number.isSafeInteger(savedVersion)) throw new Error('The database saved the appearance but returned an invalid version.');
+      themeLoadedFromServer.current = true;
       if (savedVersion > themeVersion.current) {
         themeVersion.current = savedVersion;
         setTheme(savedTheme);
         applyThemeToDOM(savedTheme);
+        configurationCache.current = {
+          ...(configurationCache.current || { theme: savedTheme, themeVersion: savedVersion }),
+          theme: savedTheme,
+          themeVersion: savedVersion
+        };
+        persistConfigurationCache();
       }
       addToast({
         type: 'success',
@@ -973,9 +1065,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const data = await res.json();
       const savedVersion = Number(res.headers.get('X-Configuration-Version'));
       if (!Number.isSafeInteger(savedVersion)) throw new Error('The database saved the settings but returned an invalid version.');
+      systemSettingsLoadedFromServer.current = true;
       if (savedVersion > systemSettingsVersion.current) {
         systemSettingsVersion.current = savedVersion;
         setSystemSettings(data);
+        configurationCache.current = {
+          ...(configurationCache.current || { theme, themeVersion: themeVersion.current }),
+          systemSettings: data,
+          systemSettingsVersion: savedVersion
+        };
+        persistConfigurationCache();
       }
       addToast({
         type: 'success',
@@ -1065,10 +1164,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (savedQueue) {
       try { setOfflineQueue(JSON.parse(savedQueue)); } catch {}
     }
-    if (sessionStorage.getItem('slsu_google_oauth_pending') === 'true') return;
+    if (sessionStorage.getItem('slsu_google_oauth_pending') === 'true' && supabase) return;
+    sessionStorage.removeItem('slsu_google_oauth_pending');
     const token = localStorage.getItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
     if (token) {
-      apiFetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      apiFetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10_000)
+      })
         .then(async res => {
           if (!res.ok) throw new Error('Stored sign-in session is no longer valid.');
           const data = await res.json();
@@ -1114,7 +1217,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY, session.access_token);
         const authorizationHeaders = new Headers();
         authorizationHeaders.set('Authorization', ['Bearer', session.access_token].join(' '));
-        const response = await apiFetch('/api/auth/me', { headers: authorizationHeaders });
+        const response = await apiFetch('/api/auth/me', {
+          headers: authorizationHeaders,
+          signal: AbortSignal.timeout(10_000)
+        });
         const result = await response.json() as { user?: UserAccount; error?: string };
         if (!response.ok || !result.user) {
           localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
@@ -1124,9 +1230,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (!active) return;
         setCurrentUser(result.user);
-        configurationLoaded.current = false;
-        setConfigurationError('');
-        setIsConfigurationLoading(true);
         setIsAuthenticated(true);
         setCurrentView('overview');
         setLoginError('');
@@ -1147,8 +1250,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   useEffect(() => {
-    if (!isAuthLoading) void refreshConfiguration();
-  }, [isAuthLoading, isAuthenticated]);
+    void refreshConfiguration();
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) void refreshConfiguration();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) void refreshAllData();

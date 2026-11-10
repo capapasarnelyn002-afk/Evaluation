@@ -216,42 +216,36 @@ const MainLayout: React.FC = () => {
 
 const ApplicationConfigurationGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const {
-    isAuthLoading,
     isConfigurationLoading,
     configurationError,
     refreshConfiguration
   } = useApp();
 
-  if (isAuthLoading || isConfigurationLoading) {
-    return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-white text-slate-700">
-        <div className="flex items-center gap-3 text-sm">
-          <LoaderCircle className="h-5 w-5 animate-spin text-slate-500" />
-          {isAuthLoading ? 'Checking administrator session…' : 'Loading saved system configuration…'}
-        </div>
-      </main>
-    );
-  }
-
-  if (configurationError) {
-    return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-white px-4 text-slate-800">
-        <section className="max-w-md space-y-4 text-center">
-          <h1 className="text-xl font-semibold">Configuration unavailable</h1>
-          <p role="alert" className="text-sm text-slate-600">{configurationError}</p>
-          <button
-            type="button"
-            onClick={() => void refreshConfiguration()}
-            className="min-h-11 rounded-lg bg-slate-800 px-4 text-sm font-semibold text-white"
-          >
-            Retry loading configuration
-          </button>
-        </section>
-      </main>
-    );
-  }
-
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {(isConfigurationLoading || configurationError) && (
+        <aside
+          aria-live="polite"
+          className="fixed right-3 top-3 z-[100] flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-lg border border-[#D9E4F0] bg-white px-3 py-2 text-xs text-[#1F2937] shadow-lg sm:right-5 sm:top-5"
+        >
+          {isConfigurationLoading && <LoaderCircle className="h-4 w-4 shrink-0 animate-spin text-[#0056A6]" />}
+          <span role={configurationError ? 'alert' : 'status'} className="min-w-0">
+            {configurationError || 'Refreshing saved configuration…'}
+          </span>
+          {configurationError && (
+            <button
+              type="button"
+              onClick={() => void refreshConfiguration()}
+              className="shrink-0 rounded-md bg-[#0056A6] px-2.5 py-1.5 font-semibold text-white hover:bg-[#003366]"
+            >
+              Retry
+            </button>
+          )}
+        </aside>
+      )}
+    </>
+  );
 };
 
 const PublicEvaluationRoute: React.FC<{ formId?: string }> = ({ formId }) => {
