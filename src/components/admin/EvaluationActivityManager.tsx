@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Activity, ActivityType, ActivityStatus, EvaluationSubmission } from '../../types';
+import { Activity, ActivityType, ActivityStatus, EvaluationSubmission, SurveyMode } from '../../types';
 import { EvaluationXlsxImportModal } from './EvaluationXlsxImportModal';
 import { EvaluationPrintDocument, EvaluationPrintMode, startEvaluationPrint } from '../EvaluationPrintDocument';
 import { 
@@ -19,7 +19,6 @@ import {
   FileText, 
   ArrowUpDown,
   X,
-  Layers,
   Save,
   Eye,
   AlertTriangle,
@@ -68,7 +67,8 @@ export const EvaluationActivityManager: React.FC = () => {
   const [formCoordinator, setFormCoordinator] = useState(currentUser.name);
   const [formSpeaker, setFormSpeaker] = useState('Faculty Extension Team');
   const [formTargetCount, setFormTargetCount] = useState(40);
-  const [formAssignedRubric, setFormAssignedRubric] = useState<string>('');
+  const [formSurveyMode, setFormSurveyMode] = useState<SurveyMode>('online');
+  const createActivityId = React.useRef('');
 
   // Activity Details Modal
   const [detailActivity, setDetailActivity] = useState<Activity | null>(null);
@@ -102,7 +102,8 @@ export const EvaluationActivityManager: React.FC = () => {
     setFormCoordinator(currentUser.name);
     setFormSpeaker('Faculty Extension Team');
     setFormTargetCount(40);
-    setFormAssignedRubric(forms[0]?.id || '');
+    setFormSurveyMode('online');
+    createActivityId.current = `act-${crypto.randomUUID()}`;
     setShowModal(true);
   };
 
@@ -121,7 +122,7 @@ export const EvaluationActivityManager: React.FC = () => {
     setFormCoordinator(act.leadCoordinator || '');
     setFormSpeaker(act.trainerOrSpeaker || '');
     setFormTargetCount(act.totalTargetParticipants || 30);
-    setFormAssignedRubric(act.assignedFormId || (forms[0]?.id || ''));
+    setFormSurveyMode(act.surveyMode || 'online');
     setShowModal(true);
   };
 
@@ -143,7 +144,8 @@ export const EvaluationActivityManager: React.FC = () => {
       leadCoordinator: formCoordinator.trim(),
       trainerOrSpeaker: formSpeaker.trim(),
       totalTargetParticipants: Number(formTargetCount),
-      assignedFormId: formAssignedRubric
+      surveyMode: formSurveyMode,
+      ...(!editingActivity ? { id: createActivityId.current } : {})
     };
 
     try {
@@ -151,6 +153,7 @@ export const EvaluationActivityManager: React.FC = () => {
         await updateActivity(editingActivity.id, payload);
       } else {
         await createActivity(payload);
+        createActivityId.current = '';
       }
       setShowModal(false);
     } catch (error) {
@@ -187,7 +190,7 @@ export const EvaluationActivityManager: React.FC = () => {
             Evaluation Activity Roster & Assignment Manager
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Create, schedule, publish, and assign dynamic evaluation forms to extension programs.
+            Create and schedule extension activities with automatically generated evaluation forms.
           </p>
         </div>
 
@@ -263,12 +266,15 @@ export const EvaluationActivityManager: React.FC = () => {
         {filteredActivities.map(act => {
           const actEvals = evaluations.filter(e => e.activityId === act.id);
           const evalCount = actEvals.length;
-          const turnoutPct = Math.min(100, Math.round((evalCount / act.totalTargetParticipants) * 100));
-          const avgRating = evalCount > 0
-            ? (actEvals.reduce((a, b) => a + b.meanRating, 0) / evalCount).toFixed(2)
+          const turnoutPct = act.totalTargetParticipants > 0
+            ? Math.min(100, Math.round((evalCount / act.totalTargetParticipants) * 100))
+            : 0;
+          const ratedEvals = actEvals.filter(evaluation => evaluation.meanRating > 0);
+          const avgRating = ratedEvals.length > 0
+            ? (ratedEvals.reduce((a, b) => a + b.meanRating, 0) / ratedEvals.length).toFixed(2)
             : 'N/A';
 
-          const assignedForm = forms.find(f => f.id === act.assignedFormId);
+          const assignedForm = forms.find(f => f.id === act.assignedFormId || f.activityId === act.id);
 
           return (
             <div 
@@ -279,6 +285,11 @@ export const EvaluationActivityManager: React.FC = () => {
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-900 border border-blue-200">
                     {act.activityType}
+                  </span>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${
+                    act.surveyMode === 'offline' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  }`}>
+                    {act.surveyMode || 'online'}
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
                     act.status === 'active' ? 'bg-blue-100 text-blue-900' :
@@ -307,8 +318,8 @@ export const EvaluationActivityManager: React.FC = () => {
                   </div>
                   {assignedForm && (
                     <div className="flex items-center gap-2 text-blue-800 font-medium">
-                      <Layers className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">Rubric: {assignedForm.title}</span>
+                      <FileText className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">Evaluation form: {assignedForm.title}</span>
                     </div>
                   )}
                 </div>
@@ -457,6 +468,24 @@ export const EvaluationActivityManager: React.FC = () => {
                     <option value="archived">Archived</option>
                   </select>
                 </div>
+                <fieldset>
+                  <legend className="block font-semibold text-slate-700 mb-1">Survey Mode:</legend>
+                  <div className="flex rounded-lg border border-slate-300 p-1">
+                    {(['online', 'offline'] as const).map(mode => (
+                      <button
+                        key={mode}
+                        type="button"
+                        aria-pressed={formSurveyMode === mode}
+                        onClick={() => setFormSurveyMode(mode)}
+                        className={`min-h-9 flex-1 rounded-md px-3 text-xs font-bold capitalize ${
+                          formSurveyMode === mode ? 'bg-blue-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Target Participants:</label>
@@ -541,21 +570,6 @@ export const EvaluationActivityManager: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Assigned Form Builder Rubric:</label>
-                <select
-                  value={formAssignedRubric}
-                  onChange={(e) => setFormAssignedRubric(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 font-medium"
-                >
-                  {forms.map(f => (
-                    <option key={f.id} value={f.id}>
-                      {f.title} ({f.sections.reduce((a, s) => a + s.questions.length, 0)} questions · {f.status})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
                 <label className="block font-semibold text-slate-700 mb-1">Program Description:</label>
                 <textarea
                   rows={2}
@@ -628,6 +642,14 @@ export const EvaluationActivityManager: React.FC = () => {
                   <span className="text-slate-400 block text-[11px]">Coordinator & Speaker</span>
                   <span className="font-bold text-slate-900">{detailActivity.leadCoordinator}</span>
                 </div>
+                <div>
+                  <span className="text-slate-400 block text-[11px]">Survey mode</span>
+                  <span className="font-bold capitalize text-slate-900">{detailActivity.surveyMode || 'online'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[11px]">Evaluation form</span>
+                  <span className="font-bold text-slate-900">{forms.find(form => form.id === detailActivity.assignedFormId || form.activityId === detailActivity.id)?.title || 'Generating'}</span>
+                </div>
               </div>
 
               <div className="p-3 rounded-lg bg-blue-50 border border-blue-100 text-xs">
@@ -686,7 +708,7 @@ export const EvaluationActivityManager: React.FC = () => {
       {printTarget && <EvaluationPrintDocument
         mode={printTarget.mode}
         activity={printTarget.activity}
-        form={forms.find(form => form.id === printTarget.activity.assignedFormId)}
+        form={forms.find(form => form.id === printTarget.activity.assignedFormId || form.activityId === printTarget.activity.id)}
         evaluation={printTarget.evaluation}
         theme={theme}
         institutionName={systemSettings.institutionName}

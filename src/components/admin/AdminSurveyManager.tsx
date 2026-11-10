@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Survey, SurveyQuestion } from '../../types';
+import { Survey, SurveyQuestion, SurveyResponse } from '../../types';
+import { apiFetch } from '../../utils/api';
 import { 
   ClipboardList, 
   Plus, 
@@ -41,7 +42,31 @@ export const AdminSurveyManager: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null);
   const [viewResponsesSurvey, setViewResponsesSurvey] = useState<Survey | null>(null);
+  const [surveyResponses, setSurveyResponses] = useState<SurveyResponse[]>([]);
+  const [responsesLoading, setResponsesLoading] = useState(false);
+  const [responsesError, setResponsesError] = useState('');
+  const responsesRequestId = useRef(0);
   const [previewSurvey, setPreviewSurvey] = useState<Survey | null>(null);
+
+  const loadSurveyResponses = async (survey: Survey) => {
+    const requestId = ++responsesRequestId.current;
+    setViewResponsesSurvey(survey);
+    setSurveyResponses([]);
+    setResponsesError('');
+    setResponsesLoading(true);
+    try {
+      const response = await apiFetch(`/api/surveys/${encodeURIComponent(survey.id)}/responses`);
+      if (!response.ok) throw new Error('Could not load survey responses.');
+      const data: SurveyResponse[] = await response.json();
+      if (requestId === responsesRequestId.current) setSurveyResponses(data);
+    } catch (error) {
+      if (requestId === responsesRequestId.current) {
+        setResponsesError(error instanceof Error ? error.message : 'Could not load survey responses.');
+      }
+    } finally {
+      if (requestId === responsesRequestId.current) setResponsesLoading(false);
+    }
+  };
 
   // Form state
   const [formTitle, setFormTitle] = useState('');
@@ -355,7 +380,7 @@ export const AdminSurveyManager: React.FC = () => {
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => setViewResponsesSurvey(survey)}
+                    onClick={() => void loadSurveyResponses(survey)}
                     title="View Response Analytics"
                     className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 cursor-pointer"
                   >
@@ -692,7 +717,7 @@ export const AdminSurveyManager: React.FC = () => {
                 <span className="text-[10px] uppercase font-bold text-blue-700 tracking-wider">Responses & Analytics</span>
                 <h3 className="font-bold text-base text-slate-900">{viewResponsesSurvey.title}</h3>
               </div>
-              <button onClick={() => setViewResponsesSurvey(null)} className="p-1 text-slate-400 hover:text-slate-600">
+              <button onClick={() => { responsesRequestId.current += 1; setViewResponsesSurvey(null); }} className="p-1 text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -700,7 +725,9 @@ export const AdminSurveyManager: React.FC = () => {
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                 <span className="text-[11px] text-slate-500 block">Total Completed</span>
-                <span className="text-xl font-black text-slate-900">{viewResponsesSurvey.responsesCount || 0}</span>
+                <span className="text-xl font-black text-slate-900">
+                  {responsesLoading ? '…' : responsesError ? 'N/A' : surveyResponses.length}
+                </span>
               </div>
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                 <span className="text-[11px] text-slate-500 block">Target Audience</span>
@@ -714,43 +741,70 @@ export const AdminSurveyManager: React.FC = () => {
 
             <div className="space-y-3 pt-2">
               <h4 className="font-bold text-xs text-slate-900 uppercase">Question Distributions & Insights</h4>
-              {viewResponsesSurvey.questions?.map((q, idx) => (
-                <div key={q.id} className="p-3.5 rounded-lg border border-slate-200 bg-white space-y-2">
+              {responsesLoading && <p className="text-sm text-slate-500">Loading submitted responses…</p>}
+              {responsesError && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                  <span>{responsesError}</span>
+                  <button type="button" onClick={() => void loadSurveyResponses(viewResponsesSurvey)} className="font-bold underline">Retry</button>
+                </div>
+              )}
+              {!responsesLoading && !responsesError && surveyResponses.length === 0 && (
+                <p className="text-sm text-slate-500">No responses have been submitted for this survey yet.</p>
+              )}
+              {!responsesLoading && !responsesError && viewResponsesSurvey.questions?.map((q, idx) => {
+                const answers = surveyResponses
+                  .map(response => response.answers?.[q.id])
+                  .filter(answer => answer !== undefined && answer !== null && answer !== '');
+                const counts = new Map<string, number>();
+                answers.forEach(answer => {
+                  const values = Array.isArray(answer) ? answer : [answer];
+                  values.forEach(value => counts.set(String(value), (counts.get(String(value)) || 0) + 1));
+                });
+                const ratingValues = answers.map(Number).filter(value => Number.isFinite(value) && value >= 1 && value <= 5);
+                const ratingMean = ratingValues.length
+                  ? (ratingValues.reduce((total, value) => total + value, 0) / ratingValues.length).toFixed(2)
+                  : null;
+                return <div key={q.id} className="p-3.5 rounded-lg border border-slate-200 bg-white space-y-2">
                   <div className="font-semibold text-xs text-slate-800">
                     {idx + 1}. {q.title}
                   </div>
                   {q.type === 'rating_scale' && (
                     <div className="flex items-center gap-3 text-xs">
-                      <span className="font-bold text-blue-800 text-sm">4.82 / 5.00 Mean</span>
-                      <span className="text-slate-500">96.4% Highly Satisfied</span>
+                      <span className="font-bold text-blue-800 text-sm">
+                        {ratingMean === null ? 'No rating responses' : `${ratingMean} / 5.00 Mean`}
+                      </span>
+                      {ratingValues.length > 0 && (
+                        <span className="text-slate-500">
+                          {Math.round((ratingValues.filter(value => value >= 4).length / ratingValues.length) * 100)}% rated 4 or 5
+                        </span>
+                      )}
                     </div>
                   )}
-                  {q.type === 'single_choice' && (
+                  {(q.type === 'single_choice' || q.type === 'multiple_choice') && answers.length > 0 && (
                     <div className="text-xs text-slate-600 space-y-1">
-                      <div className="flex justify-between text-[11px]">
-                        <span>Farmers & Fisherfolk: 48%</span>
-                        <span>Cooperative Members: 32%</span>
-                        <span>Youth: 20%</span>
-                      </div>
-                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden flex">
-                        <div className="bg-blue-700 h-full" style={{ width: '48%' }} />
-                        <div className="bg-amber-600 h-full" style={{ width: '32%' }} />
-                        <div className="bg-blue-600 h-full" style={{ width: '20%' }} />
-                      </div>
+                      {[...(q.options || [])].map(option => {
+                        const count = counts.get(option) || 0;
+                        const percentage = Math.round((count / answers.length) * 100);
+                        return (
+                          <div key={option} className="flex justify-between gap-3">
+                            <span>{option}</span><span>{count} ({percentage}%)</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-                  {q.type === 'text' && (
+                  {q.type === 'text' && answers.length > 0 && (
                     <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-100 italic">
-                      "Would love more hands-on solar fish drying workshops in Barangay Sto. Niño and digital bookkeeping for sari-sari store owners."
+                      {answers.map(String).join(' · ')}
                     </div>
                   )}
                 </div>
-              ))}
+              })}
             </div>
 
             <div className="flex justify-end pt-3 border-t border-slate-100">
               <button
-                onClick={() => setViewResponsesSurvey(null)}
+                onClick={() => { responsesRequestId.current += 1; setViewResponsesSurvey(null); }}
                 className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 font-semibold text-xs"
               >
                 Close Insights

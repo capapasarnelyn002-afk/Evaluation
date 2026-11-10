@@ -111,6 +111,7 @@ interface ServerActivity {
   leadCoordinator: string;
   trainerOrSpeaker: string;
   status: 'active' | 'completed' | 'upcoming' | 'draft' | 'archived';
+  surveyMode?: 'online' | 'offline';
   totalTargetParticipants: number;
   assignedFormId?: string;
   createdAt?: string;
@@ -322,11 +323,35 @@ app.get('/api/activities', (_req, res) => {
 
 // 2. Create activity
 app.post('/api/activities', (req, res) => {
+  const surveyMode = req.body?.surveyMode ?? 'online';
+  if (!['online', 'offline'].includes(surveyMode)) {
+    return res.status(400).json({ error: 'Choose online or offline survey mode.' });
+  }
+  if (typeof req.body?.title !== 'string' || !req.body.title.trim() || req.body.title.trim().length > 200) {
+    return res.status(400).json({ error: 'An activity title between 1 and 200 characters is required.' });
+  }
+
+  const requestedId = typeof req.body.id === 'string' && /^act-[\da-f-]{36}$/i.test(req.body.id)
+    ? req.body.id
+    : `act-${randomUUID()}`;
+  const existingActivity = activities.find(activity => activity.id === requestedId);
+  if (existingActivity) {
+    Object.assign(existingActivity, {
+      ...req.body,
+      id: requestedId,
+      assignedFormId: existingActivity.assignedFormId,
+      surveyMode
+    });
+    const form = ensureActivityEvaluationForm(existingActivity);
+    return res.json({ activity: existingActivity, form });
+  }
+
   const newActivity: ServerActivity = {
-    id: `act-${Date.now()}`,
-    title: req.body.title || 'Untitled Extension Activity',
+    id: requestedId,
+    title: req.body.title.trim(),
     activityType: req.body.activityType || 'training',
     description: req.body.description || '',
+    instructions: req.body.instructions || '',
     date: req.body.date || new Date().toISOString().split('T')[0],
     venue: req.body.venue || 'SLSU-Hinunangan',
     targetBeneficiaries: req.body.targetBeneficiaries || 'Community members',
@@ -334,10 +359,12 @@ app.post('/api/activities', (req, res) => {
     leadCoordinator: req.body.leadCoordinator || 'Extension Coordinator',
     trainerOrSpeaker: req.body.trainerOrSpeaker || 'Faculty Resource Speaker',
     status: req.body.status || 'active',
+    surveyMode,
     totalTargetParticipants: req.body.totalTargetParticipants || 30
   };
+  const form = ensureActivityEvaluationForm(newActivity);
   activities.unshift(newActivity);
-  res.status(201).json(newActivity);
+  res.status(201).json({ activity: newActivity, form });
 });
 
 // 3. Get evaluations (supports filter by activityId)
@@ -377,10 +404,18 @@ app.post('/api/evaluations', (req, res) => {
   if (payload.formId) {
     submittedForm = evaluationForms.find(form => form.id === payload.formId);
     if (!submittedForm) return res.status(404).json({ error: 'Evaluation form not found.' });
-    if (submittedForm.status !== 'published') return res.status(409).json({ error: 'This evaluation form is not published.' });
+    if (submittedForm.status !== 'published' && payload.submissionSource !== 'offline_synced') {
+      return res.status(409).json({ error: 'This evaluation form is not published.' });
+    }
+    if (activity.surveyMode === 'offline' && payload.submissionSource !== 'offline_synced') {
+      return res.status(400).json({ error: 'This activity accepts paper-based evaluations only.' });
+    }
     if (activity.assignedFormId !== submittedForm.id) return res.status(400).json({ error: 'This form is not assigned to the selected activity.' });
   } else if (activity.assignedFormId) {
     return res.status(400).json({ error: 'The assigned evaluation form is required.' });
+  }
+  if (activity.surveyMode === 'offline' && payload.submissionSource !== 'offline_synced') {
+    return res.status(400).json({ error: 'This activity accepts paper-based evaluations only.' });
   }
 
   let submittedSpecificRatings = payload.specificRatings || {};
@@ -481,7 +516,7 @@ app.post('/api/evaluations', (req, res) => {
     ? submittedWeightedMean || 0
     : allRatings.length > 0
     ? Number((allRatings.reduce((a, b) => a + b, 0) / allRatings.length).toFixed(2))
-    : 4.0;
+    : 0;
 
   const controlNumber = payload.controlNumber || `SLSU-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -562,12 +597,12 @@ app.post('/api/sync', (req, res) => {
     const allComments = `${item.comments?.strengths || ''} ${item.comments?.improvements || ''} ${item.comments?.suggestions || ''}`;
     const sentimentAnalysis = analyzeSentimentAndTopics(allComments);
 
-    const coreVals = Object.values(item.coreRatings || {}) as number[];
-    const specVals = Object.values(item.specificRatings || {}) as number[];
+    const coreVals = (Object.values(item.coreRatings || {}) as number[]).filter(value => Number.isFinite(value) && value > 0);
+    const specVals = (Object.values(item.specificRatings || {}) as number[]).filter(value => Number.isFinite(value) && value > 0);
     const allRatings = [...coreVals, ...specVals];
     const meanRating = allRatings.length > 0
       ? Number((allRatings.reduce((a, b) => a + b, 0) / allRatings.length).toFixed(2))
-      : 4.0;
+      : 0;
 
     const newEval: ServerEvaluation = {
       id: item.id || `eval-sync-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -1210,6 +1245,7 @@ function getPublicFormBundle(formId: string) {
     item.id === form.activityId || item.assignedFormId === form.id
   );
   if (!activity || !['active', 'upcoming'].includes(activity.status)) return null;
+  if (activity.surveyMode === 'offline') return null;
 
   const today = new Date().toISOString().slice(0, 10);
   const expiration = form.expiresAt || activity.deadline;
@@ -1545,6 +1581,7 @@ app.post('/api/imports/evaluation', (req, res) => {
     leadCoordinator: 'To be assigned',
     trainerOrSpeaker: 'To be assigned',
     status: 'draft',
+    surveyMode: 'online',
     totalTargetParticipants: 30,
     assignedFormId: formId,
     createdAt: now
@@ -1617,6 +1654,67 @@ const validateFormDefinition = (form: any): string | null => {
   if (form.status === 'published' && questionCount === 0) return 'Add at least one question before publishing a form.';
   return null;
 };
+
+function ensureActivityEvaluationForm(activity: ServerActivity) {
+  const existingForm = evaluationForms.find(form =>
+    form.id === activity.assignedFormId && (!form.activityId || form.activityId === activity.id)
+  ) || evaluationForms.find(form => form.activityId === activity.id);
+  const now = new Date().toISOString();
+  const formId = existingForm?.id || `activity-form-${activity.id}`;
+  const generatedQuestions = [
+    { id: `${activity.id}-overall-satisfaction`, label: 'Overall, how satisfied were you with this activity?', type: 'rating_scale', required: true, scaleMin: 1, scaleMax: 5, scaleMinLabel: 'Very dissatisfied', scaleMaxLabel: 'Very satisfied', weight: 1 },
+    { id: `${activity.id}-objectives`, label: 'How well did the activity meet its stated objectives?', type: 'rating_scale', required: true, scaleMin: 1, scaleMax: 5, scaleMinLabel: 'Not at all', scaleMaxLabel: 'Completely', weight: 1 },
+    { id: `${activity.id}-relevance`, label: 'How relevant was the activity to your needs?', type: 'rating_scale', required: true, scaleMin: 1, scaleMax: 5, scaleMinLabel: 'Not relevant', scaleMaxLabel: 'Very relevant', weight: 1 },
+    { id: `${activity.id}-facilities`, label: 'How would you rate the facilities and learning materials?', type: 'rating_scale', required: true, scaleMin: 1, scaleMax: 5, scaleMinLabel: 'Poor', scaleMaxLabel: 'Excellent', weight: 1 },
+    { id: `${activity.id}-time-management`, label: 'How would you rate the activity schedule and time management?', type: 'rating_scale', required: true, scaleMin: 1, scaleMax: 5, scaleMinLabel: 'Poor', scaleMaxLabel: 'Excellent', weight: 1 },
+    { id: `${activity.id}-organization`, label: 'How would you rate the overall organization of the activity?', type: 'rating_scale', required: true, scaleMin: 1, scaleMax: 5, scaleMinLabel: 'Poor', scaleMaxLabel: 'Excellent', weight: 1 }
+  ];
+  const sections = existingForm?.sections?.some((section: any) => section.questions?.length)
+    ? existingForm.sections
+    : [
+        { id: `${activity.id}-ratings`, title: 'Activity Evaluation', description: 'Select one rating for each question. 1 is the lowest and 5 is the highest.', questions: generatedQuestions },
+        {
+          id: `${activity.id}-comments`,
+          title: 'Comments and Suggestions',
+          questions: [
+            { id: `${activity.id}-strengths`, label: 'What did you find most useful or valuable?', type: 'long_text', required: false },
+            { id: `${activity.id}-improvements`, label: 'What could be improved for future activities?', type: 'long_text', required: false },
+            { id: `${activity.id}-suggestions`, label: 'Do you have any other comments or suggestions?', type: 'long_text', required: false }
+          ]
+        }
+      ];
+  const onlineAndOpen = activity.surveyMode !== 'offline' && ['active', 'upcoming'].includes(activity.status);
+  const form = {
+    ...(existingForm || {}),
+    id: formId,
+    title: activity.title,
+    description: [
+      activity.description,
+      `Activity date: ${activity.date}`,
+      activity.venue ? `Venue: ${activity.venue}` : ''
+    ].filter(Boolean).join('\n'),
+    instructions: activity.instructions || 'Please answer each rating based on your experience in this activity. Your feedback will be used to improve future extension services.',
+    status: onlineAndOpen ? 'published' : 'draft',
+    publicEnabled: onlineAndOpen,
+    expiresAt: activity.deadline || null,
+    version: existingForm ? (existingForm.version || 1) + 1 : 1,
+    targetActivityType: activity.activityType,
+    activityId: activity.id,
+    targetRespondent: activity.targetBeneficiaries,
+    purpose: 'Automatically generated activity evaluation form',
+    sections,
+    createdAt: existingForm?.createdAt || now,
+    updatedAt: now
+  };
+  if (existingForm) {
+    const formIndex = evaluationForms.findIndex(item => item.id === existingForm.id);
+    evaluationForms[formIndex] = form;
+  } else {
+    evaluationForms.unshift(form);
+  }
+  activity.assignedFormId = form.id;
+  return form;
+}
 
 app.post('/api/forms', (req, res) => {
   const payload = { ...req.body, status: req.body.status || 'draft', sections: req.body.sections || [] };
@@ -2108,7 +2206,7 @@ app.get('/api/admin/metrics', (_req, res) => {
   const totalTargetParticipants = activities.reduce((a, b) => a + (b.totalTargetParticipants || 0), 0);
   const turnoutCompletionRate = totalTargetParticipants > 0
     ? Math.min(100, Math.round((totalEvaluations / totalTargetParticipants) * 100))
-    : 85;
+    : 0;
 
   const metrics = {
     totalUsers: users.length,
@@ -2147,7 +2245,21 @@ app.put('/api/activities/:id', (req, res) => {
     res.status(404).json({ error: 'Activity not found' });
     return;
   }
-  activities[idx] = { ...activities[idx], ...req.body };
+  const surveyMode = req.body?.surveyMode ?? activities[idx].surveyMode ?? 'online';
+  if (!['online', 'offline'].includes(surveyMode)) {
+    return res.status(400).json({ error: 'Choose online or offline survey mode.' });
+  }
+  if (req.body?.title !== undefined && (typeof req.body.title !== 'string' || !req.body.title.trim() || req.body.title.trim().length > 200)) {
+    return res.status(400).json({ error: 'An activity title between 1 and 200 characters is required.' });
+  }
+  activities[idx] = {
+    ...activities[idx],
+    ...req.body,
+    id: activities[idx].id,
+    assignedFormId: activities[idx].assignedFormId,
+    surveyMode
+  };
+  const form = ensureActivityEvaluationForm(activities[idx]);
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
@@ -2156,7 +2268,7 @@ app.put('/api/activities/:id', (req, res) => {
     resourceId: req.params.id,
     reason: `Updated details for activity "${activities[idx].title}"`
   });
-  res.json(activities[idx]);
+  res.json({ activity: activities[idx], form });
 });
 
 app.delete('/api/activities/:id', (req, res) => {
@@ -2183,15 +2295,18 @@ app.post('/api/activities/:id/duplicate', (req, res) => {
     res.status(404).json({ error: 'Activity not found' });
     return;
   }
-  const cloned = {
+  const cloned: ServerActivity = {
     ...orig,
-    id: `act-${Date.now()}`,
+    id: `act-${randomUUID()}`,
     title: `${orig.title} (Cohort Copy)`,
+    assignedFormId: undefined,
+    surveyMode: orig.surveyMode || 'online',
     status: 'draft',
     date: new Date().toISOString().split('T')[0],
     createdAt: new Date().toISOString()
   };
-  activities.unshift(cloned as any);
+  const form = ensureActivityEvaluationForm(cloned);
+  activities.unshift(cloned);
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),
@@ -2200,7 +2315,7 @@ app.post('/api/activities/:id/duplicate', (req, res) => {
     resourceId: cloned.id,
     reason: `Duplicated activity template from "${orig.title}"`
   });
-  res.status(201).json(cloned);
+  res.status(201).json({ activity: cloned, form });
 });
 
 // ==========================================
@@ -2319,6 +2434,9 @@ function restoreServerState(saved: unknown) {
   const state = saved as PersistedServerState;
   restoreArray(users, state.users, 'users');
   restoreArray(activities, state.activities, 'activities');
+  activities.forEach(activity => {
+    if (activity.surveyMode !== 'offline') activity.surveyMode = 'online';
+  });
   restoreArray(evaluations, state.evaluations, 'evaluations');
   restoreArray(auditLogs, state.auditLogs, 'auditLogs');
   restoreArray(evaluationForms, state.evaluationForms, 'evaluationForms');

@@ -661,16 +661,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Activity management
   const createActivity = async (activityData: Partial<Activity>): Promise<Activity> => {
+    const requestId = activityData.id || `act-${crypto.randomUUID()}`;
     const res = await apiFetch('/api/activities', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(activityData)
+      body: JSON.stringify({ ...activityData, id: requestId })
     });
-    if (!res.ok) throw new Error(await getApiError(res, 'The activity could not be created.'));
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(result.error || 'The activity could not be created.');
 
-    const created = await res.json();
-    setActivities(prev => [created, ...prev]);
-    addToast({ type: 'success', title: 'Activity Created', description: `Created "${created.title}".` });
+    const created = result.activity as Activity;
+    const generatedForm = result.form as EvaluationForm;
+    setActivities(prev => [created, ...prev.filter(activity => activity.id !== created.id)]);
+    setForms(prev => [generatedForm, ...prev.filter(form => form.id !== generatedForm.id)]);
+    addToast({
+      type: 'success',
+      title: 'Activity and Form Created',
+      description: `Created "${created.title}" and its evaluation form.`
+    });
     return created;
   };
 
@@ -693,10 +701,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(activityData)
     });
-    if (!res.ok) throw new Error(await getApiError(res, 'The activity could not be updated.'));
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(result.error || 'The activity could not be updated.');
 
-    const updated = await res.json();
+    const updated = result.activity as Activity;
+    const generatedForm = result.form as EvaluationForm;
     setActivities(prev => prev.map(a => a.id === id ? updated : a));
+    setForms(prev => [generatedForm, ...prev.filter(form => form.id !== generatedForm.id)]);
     addToast({ type: 'success', title: 'Activity Updated', description: `Saved changes to "${updated.title}".` });
     return updated;
   };
@@ -722,8 +733,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const duplicateActivity = async (id: string): Promise<Activity> => {
     const res = await apiFetch(`/api/activities/${id}/duplicate`, { method: 'POST' });
     if (!res.ok) throw new Error(await getApiError(res, 'The activity could not be duplicated.'));
-    const cloned = await res.json();
-    setActivities(prev => [cloned, ...prev]);
+    const result = await res.json();
+    const cloned = result.activity as Activity;
+    const generatedForm = result.form as EvaluationForm;
+    setActivities(prev => [cloned, ...prev.filter(activity => activity.id !== cloned.id)]);
+    setForms(prev => [generatedForm, ...prev.filter(form => form.id !== generatedForm.id)]);
     addToast({ type: 'success', title: 'Activity Duplicated', description: `Created cohort clone "${cloned.title}".` });
     return cloned;
   };
@@ -1314,20 +1328,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         controlNumber: evaluationData.controlNumber || `SLSU-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
         verificationMethod: evaluationData.verificationMethod || 'student_id',
         coreRatings: evaluationData.coreRatings || {
-          satisfaction: 5,
-          objectives: 5,
-          relevance: 5,
-          facilities: 5,
-          timeManagement: 5,
-          organization: 5
+          satisfaction: 0,
+          objectives: 0,
+          relevance: 0,
+          facilities: 0,
+          timeManagement: 0,
+          organization: 0
         },
         specificRatings: evaluationData.specificRatings || {},
-        meanRating: evaluationData.meanRating || 5,
+        meanRating: evaluationData.meanRating ?? 0,
         comments: evaluationData.comments || { strengths: '', improvements: '', suggestions: '' },
         sentiment: evaluationData.sentiment || {
-          overall: 'positive',
-          score: 0.8,
-          topics: ['community_needs'],
+          overall: 'neutral',
+          score: 0,
+          topics: [],
           concernUrgency: 'low'
         },
         submissionSource: 'offline_synced',

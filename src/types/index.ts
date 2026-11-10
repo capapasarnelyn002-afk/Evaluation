@@ -16,6 +16,7 @@ export interface UserAccount {
 }
 
 export type ActivityStatus = 'active' | 'completed' | 'upcoming' | 'draft' | 'archived';
+export type SurveyMode = 'online' | 'offline';
 
 export interface Activity {
   id: string;
@@ -32,6 +33,7 @@ export interface Activity {
   leadCoordinator: string;
   trainerOrSpeaker: string;
   status: ActivityStatus;
+  surveyMode: SurveyMode;
   totalTargetParticipants: number;
   evaluatedParticipants?: number;
   averageRating?: number;

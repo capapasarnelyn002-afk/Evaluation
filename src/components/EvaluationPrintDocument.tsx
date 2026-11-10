@@ -101,6 +101,18 @@ export const EvaluationPrintDocument: React.FC<EvaluationPrintDocumentProps> = (
         </section>
       )}
 
+      {mode === 'blank' && (
+        <section className="evaluation-print-meta">
+          {activity && <>
+            <p><strong>Activity date:</strong> {activity.date || '____________________'}</p>
+            <p><strong>Venue:</strong> {activity.venue || '____________________'}</p>
+          </>}
+          <p><strong>Participant name:</strong> ______________________________________________</p>
+          <p><strong>Contact information:</strong> ____________________________________________</p>
+          <p><strong>Participant category:</strong> ___________________________________________</p>
+        </section>
+      )}
+
       {mode === 'completed' && evaluation && showRespondent && (
         <section className="evaluation-print-meta">
           <p><strong>Respondent:</strong> {evaluation.participantName}</p>

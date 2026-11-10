@@ -104,9 +104,10 @@ export const ParticipantEvaluationView: React.FC = () => {
     forms
   } = useApp();
 
-  const currentActivity = activities.find(a => a.id === selectedActivityId) || activities[0];
+  const onlineActivities = activities.filter(activity => activity.surveyMode !== 'offline');
+  const currentActivity = onlineActivities.find(activity => activity.id === selectedActivityId) || onlineActivities[0];
   const assignedForm = currentActivity
-    ? forms.find(form => form.id === currentActivity.assignedFormId && form.status === 'published')
+    ? forms.find(form => (form.id === currentActivity.assignedFormId || form.activityId === currentActivity.id) && form.status === 'published')
     : undefined;
 
   // Participant demographic fields

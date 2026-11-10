@@ -26,11 +26,29 @@ create table if not exists public.activities (
   "leadCoordinator" text not null default '',
   "trainerOrSpeaker" text not null default '',
   status text not null check (status in ('active', 'completed', 'upcoming', 'draft', 'archived')),
+  "surveyMode" text not null default 'online' check ("surveyMode" in ('online', 'offline')),
   "totalTargetParticipants" integer not null default 0,
   "assignedFormId" text,
   "createdAt" timestamptz,
   __position integer not null default 0
 );
+
+alter table public.activities
+  add column if not exists "surveyMode" text not null default 'online';
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'activities_surveymode_check'
+      and conrelid = 'public.activities'::regclass
+  ) then
+    alter table public.activities
+      add constraint activities_surveymode_check check ("surveyMode" in ('online', 'offline'));
+  end if;
+end;
+$$;
 
 create table if not exists public.evaluation_forms (
   id text primary key,

@@ -123,15 +123,16 @@ export const AdminDashboard: React.FC = () => {
 
   // Calculate Metrics
   const totalEvaluationsCount = filteredEvaluations.length;
-  const overallMean = totalEvaluationsCount > 0
-    ? Number((filteredEvaluations.reduce((acc, curr) => acc + curr.meanRating, 0) / totalEvaluationsCount).toFixed(2))
+  const ratedEvaluations = filteredEvaluations.filter(evaluation => evaluation.meanRating > 0);
+  const overallMean = ratedEvaluations.length > 0
+    ? Number((ratedEvaluations.reduce((acc, curr) => acc + curr.meanRating, 0) / ratedEvaluations.length).toFixed(2))
     : 0;
 
-  const promoters = filteredEvaluations.filter(e => e.meanRating >= 4.5).length;
-  const detractors = filteredEvaluations.filter(e => e.meanRating < 3.5).length;
-  const netSatisfactionScore = totalEvaluationsCount > 0
-    ? Math.round(((promoters - detractors) / totalEvaluationsCount) * 100)
-    : 85;
+  const promoters = ratedEvaluations.filter(e => e.meanRating >= 4.5).length;
+  const detractors = ratedEvaluations.filter(e => e.meanRating < 3.5).length;
+  const netSatisfactionScore = ratedEvaluations.length > 0
+    ? Math.round(((promoters - detractors) / ratedEvaluations.length) * 100)
+    : null;
 
   const positiveSentimentCount = filteredEvaluations.filter(e => e.sentiment.overall === 'positive').length;
   const neutralSentimentCount = filteredEvaluations.filter(e => e.sentiment.overall === 'neutral').length;
@@ -453,7 +454,9 @@ export const AdminDashboard: React.FC = () => {
                 <span className="text-slate-600 font-medium tabular-nums">{promoters} Promoters</span>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-slate-900 tabular-nums">+{netSatisfactionScore}%</span>
+                <span className="text-3xl font-extrabold text-slate-900 tabular-nums">
+                  {netSatisfactionScore === null ? 'N/A' : `${netSatisfactionScore > 0 ? '+' : ''}${netSatisfactionScore}%`}
+                </span>
               </div>
               <div className="mt-2 text-xs text-slate-500">
                 Calculated from promoters (4.5+) vs detractors (&lt;3.5)

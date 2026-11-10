@@ -83,6 +83,9 @@ export const EvaluationFormBuilder: React.FC = () => {
 
   // Selected or active form
   const currentForm = editingForm || forms.find(f => f.id === activeFormId) || forms[0];
+  const currentFormActivity = currentForm
+    ? activities.find(activity => activity.id === currentForm.activityId || activity.assignedFormId === currentForm.id)
+    : undefined;
   const publicLink = currentForm ? `${window.location.origin}/evaluate/${encodeURIComponent(currentForm.id)}` : '';
 
   const handleCopyPublicLink = async () => {
@@ -664,6 +667,10 @@ export const EvaluationFormBuilder: React.FC = () => {
                     <span>·</span>
                     <span>Total Sections: <strong>{currentForm.sections.length}</strong></span>
                   </div>
+                  {currentFormActivity && <p className="mt-2 text-xs text-slate-500">
+                    Activity: <strong className="text-slate-700">{currentFormActivity.title}</strong>
+                    <span className="ml-2 capitalize">· {currentFormActivity.surveyMode || 'online'}</span>
+                  </p>}
                 </div>
               )}
             </div>
@@ -1198,7 +1205,13 @@ export const EvaluationFormBuilder: React.FC = () => {
         </div>
       )}
 
-      {printForm && <EvaluationPrintDocument mode="blank" form={printForm} theme={theme} institutionName={systemSettings.institutionName} />}
+      {printForm && <EvaluationPrintDocument
+        mode="blank"
+        form={printForm}
+        activity={activities.find(activity => activity.id === printForm.activityId || activity.assignedFormId === printForm.id)}
+        theme={theme}
+        institutionName={systemSettings.institutionName}
+      />}
       {showImportModal && <EvaluationXlsxImportModal
         saveMode="form"
         onClose={() => setShowImportModal(false)}

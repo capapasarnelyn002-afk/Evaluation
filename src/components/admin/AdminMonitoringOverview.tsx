@@ -37,9 +37,10 @@ export const AdminMonitoringOverview: React.FC = () => {
   const participantUsers = systemMetrics ? systemMetrics.participantUsers : users.filter(u => u.role === 'participant').length;
 
   const totalEvals = evaluations.length;
-  const overallMean = totalEvals > 0
-    ? Number((evaluations.reduce((a, b) => a + b.meanRating, 0) / totalEvals).toFixed(2))
-    : (systemMetrics?.overallSatisfactionMean || 4.78);
+  const ratedEvaluations = evaluations.filter(evaluation => evaluation.meanRating > 0);
+  const overallMean = ratedEvaluations.length > 0
+    ? Number((ratedEvaluations.reduce((a, b) => a + b.meanRating, 0) / ratedEvaluations.length).toFixed(2))
+    : null;
 
   const totalActivities = activities.length;
   const activeActivities = activities.filter(a => a.status === 'active').length;
@@ -54,13 +55,13 @@ export const AdminMonitoringOverview: React.FC = () => {
   const totalTargetParticipants = activities.reduce((a, b) => a + (b.totalTargetParticipants || 0), 0);
   const turnoutRate = totalTargetParticipants > 0
     ? Math.min(100, Math.round((totalEvals / totalTargetParticipants) * 100))
-    : (systemMetrics?.turnoutCompletionRate || 88);
+    : 0;
 
-  const promoters = evaluations.filter(e => e.meanRating >= 4.5).length;
-  const detractors = evaluations.filter(e => e.meanRating < 3.5).length;
-  const netSatisfactionScore = totalEvals > 0
-    ? Math.round(((promoters - detractors) / totalEvals) * 100)
-    : 85;
+  const promoters = ratedEvaluations.filter(e => e.meanRating >= 4.5).length;
+  const detractors = ratedEvaluations.filter(e => e.meanRating < 3.5).length;
+  const netSatisfactionScore = ratedEvaluations.length > 0
+    ? Math.round(((promoters - detractors) / ratedEvaluations.length) * 100)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -118,12 +119,12 @@ export const AdminMonitoringOverview: React.FC = () => {
             <span className="font-bold text-blue-800">Target: ≥{systemSettings.targetSatisfactionMean}</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-slate-900 tabular-nums">{overallMean}</span>
+            <span className="text-3xl font-extrabold text-slate-900 tabular-nums">{overallMean ?? '—'}</span>
             <span className="text-xs text-slate-400">/ 5.00</span>
           </div>
           <div className="mt-2 text-xs text-blue-800 font-medium flex items-center gap-1">
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>AACCUP Level III Compliant</span>
+            <span>{ratedEvaluations.length ? `Based on ${ratedEvaluations.length} rated responses` : 'No rated responses yet'}</span>
           </div>
         </div>
 
@@ -198,7 +199,9 @@ export const AdminMonitoringOverview: React.FC = () => {
             {activities.slice(0, 4).map(act => {
               const actEvals = evaluations.filter(e => e.activityId === act.id);
               const count = actEvals.length;
-              const pct = Math.min(100, Math.round((count / act.totalTargetParticipants) * 100));
+              const pct = act.totalTargetParticipants > 0
+                ? Math.min(100, Math.round((count / act.totalTargetParticipants) * 100))
+                : 0;
               return (
                 <div key={act.id} className="space-y-1.5">
                   <div className="flex justify-between items-baseline">
@@ -209,7 +212,7 @@ export const AdminMonitoringOverview: React.FC = () => {
                       </span>
                     </div>
                     <span className="font-bold text-slate-700 tabular-nums">
-                      {count} / {act.totalTargetParticipants} ({pct}%)
+                      {count} / {act.totalTargetParticipants || '—'} ({act.totalTargetParticipants ? `${pct}%` : 'No target'})
                     </span>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
@@ -272,7 +275,7 @@ export const AdminMonitoringOverview: React.FC = () => {
 
           <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
             <span className="text-slate-500">Net Satisfaction Score:</span>
-            <span className="font-bold text-blue-900 tabular-nums">+{netSatisfactionScore}% NSS</span>
+            <span className="font-bold text-blue-900 tabular-nums">{netSatisfactionScore === null ? 'No responses' : `${netSatisfactionScore > 0 ? '+' : ''}${netSatisfactionScore}% NSS`}</span>
           </div>
         </div>
 

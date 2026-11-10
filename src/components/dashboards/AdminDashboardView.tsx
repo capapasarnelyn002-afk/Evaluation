@@ -120,18 +120,48 @@ export const AdminDashboardView: React.FC = () => {
 
   // Metrics
   const totalEvals = evaluations.length;
-  const overallMean = totalEvals > 0
-    ? Number((evaluations.reduce((a, b) => a + b.meanRating, 0) / totalEvals).toFixed(2))
+  const ratedEvaluations = evaluations.filter(evaluation => evaluation.meanRating > 0);
+  const overallMean = ratedEvaluations.length > 0
+    ? Number((ratedEvaluations.reduce((a, b) => a + b.meanRating, 0) / ratedEvaluations.length).toFixed(2))
     : 0;
 
-  const promoters = evaluations.filter(e => e.meanRating >= 4.5).length;
-  const detractors = evaluations.filter(e => e.meanRating < 3.5).length;
-  const netSatisfactionScore = totalEvals > 0
-    ? Math.round(((promoters - detractors) / totalEvals) * 100)
-    : 0;
+  const promoters = ratedEvaluations.filter(e => e.meanRating >= 4.5).length;
+  const detractors = ratedEvaluations.filter(e => e.meanRating < 3.5).length;
+  const netSatisfactionScore = ratedEvaluations.length > 0
+    ? Math.round(((promoters - detractors) / ratedEvaluations.length) * 100)
+    : null;
 
   const offlineCount = evaluations.filter(e => e.submissionSource === 'offline_synced').length;
   const onlineCount = evaluations.filter(e => e.submissionSource === 'online').length;
+  const reportEvaluations = selectedActivityFilter === 'all'
+    ? evaluations
+    : evaluations.filter(evaluation => evaluation.activityId === selectedActivityFilter);
+  const reportDimensions = [
+    { label: 'Overall Satisfaction', key: 'satisfaction', match: 'satisfied' },
+    { label: 'Attainment of Objectives', key: 'objectives', match: 'objectives' },
+    { label: 'Content Relevance & Utility', key: 'relevance', match: 'relevant' },
+    { label: 'Facilities & Logistics', key: 'facilities', match: 'facilities' },
+    { label: 'Time Management', key: 'timeManagement', match: 'time management' },
+    { label: 'Program Organization', key: 'organization', match: 'organization' }
+  ].map(dimension => {
+    const scores = reportEvaluations.flatMap(evaluation => {
+      const coreScore = Number((evaluation.coreRatings as Record<string, unknown> | undefined)?.[dimension.key]);
+      if (Number.isFinite(coreScore) && coreScore > 0) return [coreScore];
+      const question = evaluation.formSnapshot?.sections
+        .flatMap(section => section.questions)
+        .find(item => item.label.toLowerCase().includes(dimension.match));
+      const formScore = question
+        ? Number(evaluation.customAnswers?.[question.id] ?? evaluation.specificRatings?.[question.id])
+        : Number.NaN;
+      return Number.isFinite(formScore) && formScore > 0 ? [formScore] : [];
+    });
+    return {
+      ...dimension,
+      score: scores.length > 0
+        ? Number((scores.reduce((total, score) => total + score, 0) / scores.length).toFixed(2))
+        : null
+    };
+  }).filter(dimension => dimension.score !== null);
 
   // Filter submissions
   const filteredSubmissions = evaluations.filter(sub => {
@@ -234,6 +264,7 @@ export const AdminDashboardView: React.FC = () => {
   };
 
   const handleGenerateReport = async () => {
+    if (reportEvaluations.length === 0) return;
     setIsGeneratingReport(true);
     try {
       const res = await apiFetch('/api/ai/executive-report', {
@@ -269,7 +300,7 @@ export const AdminDashboardView: React.FC = () => {
 
   const handleAskAi = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quickQuestion.trim()) return;
+    if (!quickQuestion.trim() || reportEvaluations.length === 0) return;
     setIsAskingAi(true);
     setQuickAnswer(null);
 
@@ -289,6 +320,20 @@ export const AdminDashboardView: React.FC = () => {
       setIsAskingAi(false);
     }
   };
+
+  if ((currentView === 'reports' || currentView === 'analytics' || currentView === 'ai_reports') && reportEvaluations.length === 0) {
+    return (
+      <section className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xs">
+        <FileSpreadsheet className="mx-auto h-10 w-10 text-slate-400" aria-hidden="true" />
+        <h2 className="mt-4 text-xl font-bold text-slate-900">No Evaluation Results Yet</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          No participants have submitted evaluations. Results and analytics will appear here once responses are received.
+        </p>
+        <p className="mt-4 font-semibold text-slate-800">Total responses: 0</p>
+        <p className="mt-1 text-xs text-slate-500">No evaluation results or analytics are available.</p>
+      </section>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -327,6 +372,7 @@ export const AdminDashboardView: React.FC = () => {
                 <p className="text-xs text-slate-500 mt-1">
                   Synthesize qualitative beneficiary remarks, quantitative Likert ratings, and institutional targets into an accreditation-ready executive report.
                 </p>
+                <p className="mt-1 text-xs font-semibold text-slate-700">Total responses: {reportEvaluations.length}</p>
               </div>
 
               <button
@@ -500,13 +546,18 @@ export const AdminDashboardView: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
               {[
-                { label: 'Overall Satisfaction', key: 'satisfaction', benchmark: 4.5, score: 4.88 },
-                { label: 'Attainment of Objectives', key: 'objectives', benchmark: 4.5, score: 4.82 },
-                { label: 'Content Relevance & Utility', key: 'relevance', benchmark: 4.5, score: 4.90 },
-                { label: 'Facilities & Logistics', key: 'facilities', benchmark: 4.5, score: 4.65 },
-                { label: 'Time Management', key: 'timeManagement', benchmark: 4.5, score: 4.70 },
-                { label: 'Program Organization', key: 'organization', benchmark: 4.5, score: 4.85 },
+                ...reportDimensions.map(dimension => ({
+                  ...dimension,
+                  benchmark: systemSettings.targetSatisfactionMean
+                }))
               ].map(dim => {
+                if (dim.score === null) {
+                  return (
+                    <div key={dim.key} className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-500">
+                      {dim.label}: no recorded ratings.
+                    </div>
+                  );
+                }
                 const diff = (dim.score - dim.benchmark).toFixed(2);
                 return (
                   <div key={dim.key} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">

@@ -22,19 +22,16 @@ export const TrainerDashboardView: React.FC = () => {
     currentView, 
     activities, 
     evaluations, 
+    forms,
     systemSettings 
   } = useApp();
 
   const [selectedSessionFilter, setSelectedSessionFilter] = useState<string>('all');
 
-  // Filter activities assigned to this trainer (or match by name/role)
-  const myActivities = activities.filter(a => 
-    a.trainerOrSpeaker.toLowerCase().includes(currentUser.name.toLowerCase().split(' ')[1] || '') ||
-    a.trainerOrSpeaker.toLowerCase().includes('capapas') ||
-    a.trainerOrSpeaker.toLowerCase().includes('trainer')
+  const myActivities = activities.filter(a =>
+    a.trainerOrSpeaker.toLowerCase().includes(currentUser.name.trim().toLowerCase())
   );
-
-  const activeActivities = myActivities.length > 0 ? myActivities : activities.slice(0, 3);
+  const activeActivities = myActivities;
 
   // Filter evaluations for these activities
   const myActivityIds = activeActivities.map(a => a.id);
@@ -46,38 +43,32 @@ export const TrainerDashboardView: React.FC = () => {
   });
 
   const totalReviews = trainerEvaluations.length;
-  const overallTrainerScore = totalReviews > 0
-    ? Number((trainerEvaluations.reduce((a, b) => a + b.meanRating, 0) / totalReviews).toFixed(2))
-    : 4.85;
+  const ratedEvaluations = trainerEvaluations.filter(evaluation => evaluation.meanRating > 0);
+  const overallTrainerScore = ratedEvaluations.length > 0
+    ? Number((ratedEvaluations.reduce((a, b) => a + b.meanRating, 0) / ratedEvaluations.length).toFixed(2))
+    : null;
 
-  // Breakdown metrics for teaching dimensions
-  const satisfactionMean = totalReviews > 0
-    ? Number((trainerEvaluations.reduce((a, b) => a + b.coreRatings.satisfaction, 0) / totalReviews).toFixed(2))
-    : 4.90;
-
-  const objectivesAttained = totalReviews > 0
-    ? Number((trainerEvaluations.reduce((a, b) => a + b.coreRatings.objectives, 0) / totalReviews).toFixed(2))
-    : 4.88;
-
-  const relevanceScore = totalReviews > 0
-    ? Number((trainerEvaluations.reduce((a, b) => a + b.coreRatings.relevance, 0) / totalReviews).toFixed(2))
-    : 4.85;
-
-  const facilitiesRating = totalReviews > 0
-    ? Number((trainerEvaluations.reduce((a, b) => a + b.coreRatings.facilities, 0) / totalReviews).toFixed(2))
-    : 4.60;
-
-  const organizationScore = totalReviews > 0
-    ? Number((trainerEvaluations.reduce((a, b) => a + b.coreRatings.organization, 0) / totalReviews).toFixed(2))
-    : 4.82;
-
-  const teachingDimensions = [
-    { title: 'Mastery of Topic & Technical Competence', score: 4.92, benchmark: 4.00, grade: 'Outstanding (A+)' },
-    { title: 'Presentation Clarity, Audio & Visual Pacing', score: 4.84, benchmark: 4.00, grade: 'Very Satisfactory' },
-    { title: 'Hands-on Drills & Practical Laboratory Guidance', score: 4.89, benchmark: 4.00, grade: 'Outstanding (A+)' },
-    { title: 'Instructional Handouts & Learning Materials', score: 4.78, benchmark: 4.00, grade: 'Very Satisfactory' },
-    { title: 'Beneficiary Engagement & Question Responsiveness', score: 4.95, benchmark: 4.00, grade: 'Outstanding (A+)' }
-  ];
+  const dimensionScores = new Map<string, number[]>();
+  trainerEvaluations.forEach(evaluation => {
+    const form = forms.find(candidate => candidate.id === evaluation.formId) || evaluation.formSnapshot;
+    form?.sections.forEach(section => section.questions.forEach(question => {
+      if (!['rating_scale', 'star_rating', 'likert_scale'].includes(question.type)) return;
+      const answer = evaluation.customAnswers?.[question.id];
+      if (typeof answer !== 'number' || !Number.isFinite(answer)) return;
+      dimensionScores.set(question.label, [...(dimensionScores.get(question.label) || []), answer]);
+    }));
+    Object.entries(evaluation.coreRatings || {}).forEach(([key, score]) => {
+      if (typeof score !== 'number' || score <= 0) return;
+      const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, char => char.toUpperCase());
+      dimensionScores.set(label, [...(dimensionScores.get(label) || []), score]);
+    });
+  });
+  const teachingDimensions = [...dimensionScores.entries()].map(([title, scores]) => ({
+    title,
+    score: Number((scores.reduce((total, score) => total + score, 0) / scores.length).toFixed(2))
+  }));
+  const objectivesAttained = teachingDimensions.find(dimension => /objective/i.test(dimension.title))?.score ?? null;
+  const satisfactionScore = teachingDimensions.find(dimension => /satisfaction/i.test(dimension.title))?.score ?? null;
 
   const renderContent = () => {
     switch (currentView) {
@@ -97,9 +88,10 @@ export const TrainerDashboardView: React.FC = () => {
               {activeActivities.map(act => {
                 const sessionEvals = evaluations.filter(e => e.activityId === act.id);
                 const count = sessionEvals.length;
-                const score = count > 0
-                  ? (sessionEvals.reduce((a, b) => a + b.meanRating, 0) / count).toFixed(2)
-                  : '4.85';
+                const sessionRated = sessionEvals.filter(evaluation => evaluation.meanRating > 0);
+                const score = sessionRated.length > 0
+                  ? (sessionRated.reduce((a, b) => a + b.meanRating, 0) / sessionRated.length).toFixed(2)
+                  : 'N/A';
 
                 return (
                   <div key={act.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
@@ -145,6 +137,9 @@ export const TrainerDashboardView: React.FC = () => {
                   </div>
                 );
               })}
+              {activeActivities.length === 0 && (
+                <p className="text-sm text-slate-500">No activities are assigned to you yet.</p>
+              )}
             </div>
           </div>
         );
@@ -184,7 +179,7 @@ export const TrainerDashboardView: React.FC = () => {
                     <div>
                       <span className="font-bold text-blue-900 block text-[11px]">Key Strengths Noted:</span>
                       <p className="text-slate-700 italic bg-blue-50/50 p-2.5 rounded border border-blue-100">
-                        "{e.comments.strengths || 'The trainer explained every step clearly and showed genuine patience during the practical computer hands-on.'}"
+                        {e.comments.strengths ? `"${e.comments.strengths}"` : 'No response recorded.'}
                       </p>
                     </div>
 
@@ -204,6 +199,9 @@ export const TrainerDashboardView: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {trainerEvaluations.length === 0 && (
+                <p className="text-sm text-slate-500">No evaluation feedback has been submitted for this selection.</p>
+              )}
             </div>
           </div>
         );
@@ -236,18 +234,19 @@ export const TrainerDashboardView: React.FC = () => {
                       <td className="px-4 py-3.5 text-center font-extrabold text-blue-900 tabular-nums text-sm">
                         {dim.score.toFixed(2)}
                       </td>
-                      <td className="px-4 py-3.5 text-center font-medium text-slate-500 tabular-nums">
-                        ≥{dim.benchmark.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3.5 font-semibold text-blue-800">{dim.grade}</td>
+                      <td className="px-4 py-3.5 text-center font-medium text-slate-500 tabular-nums">≥4.00</td>
+                      <td className="px-4 py-3.5 font-semibold text-blue-800">{dim.score >= 4 ? 'Meets target' : 'Below target'}</td>
                       <td className="px-4 py-3.5">
                         <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 font-bold text-[10px] flex items-center gap-1 w-max">
                           <CheckCircle2 className="w-3 h-3 text-blue-700" />
-                          <span>Compliant</span>
+                          <span>{dim.score >= 4 ? 'Meets target' : 'Below target'}</span>
                         </span>
                       </td>
                     </tr>
                   ))}
+                  {teachingDimensions.length === 0 && (
+                    <tr><td className="px-5 py-4 text-slate-500" colSpan={5}>No rating responses have been submitted yet.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -264,36 +263,35 @@ export const TrainerDashboardView: React.FC = () => {
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
                   <span className="font-semibold uppercase tracking-wider">Trainer Overall Rating</span>
-                  <span className="text-blue-800 font-bold">Target ≥4.00</span>
+                  <span className="text-blue-800 font-bold">Based on submitted ratings</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-extrabold text-blue-950 tabular-nums">{overallTrainerScore}</span>
+                  <span className="text-3xl font-extrabold text-blue-950 tabular-nums">{overallTrainerScore ?? 'N/A'}</span>
                   <span className="text-xs text-slate-400">/ 5.00</span>
                 </div>
                 <div className="mt-2 text-xs text-blue-800 font-medium flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Ranked Outstanding across all cohorts</span>
+                  {overallTrainerScore === null ? 'No rated submissions yet.' : `${ratedEvaluations.length} rated submissions`}
                 </div>
               </div>
 
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
-                  <span className="font-semibold uppercase tracking-wider">Topic Mastery Rating</span>
-                  <span className="text-blue-700 font-bold">Dimension 1</span>
+                  <span className="font-semibold uppercase tracking-wider">Satisfaction Rating</span>
+                  <span className="text-blue-700 font-bold">Submitted responses</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-extrabold text-slate-900 tabular-nums">4.92</span>
+                  <span className="text-3xl font-extrabold text-slate-900 tabular-nums">{satisfactionScore ?? 'N/A'}</span>
                   <span className="text-xs text-slate-400">/ 5.00</span>
                 </div>
                 <div className="mt-2 text-xs text-slate-500">
-                  Beneficiaries commended deep technical knowledge
+                  Calculated from recorded satisfaction responses
                 </div>
               </div>
 
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
                   <span className="font-semibold uppercase tracking-wider">Assigned Sessions</span>
-                  <span className="text-slate-600 font-medium">AY 2025-2026</span>
+                  <span className="text-slate-600 font-medium">Assigned to you</span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-extrabold text-slate-900 tabular-nums">{activeActivities.length}</span>
@@ -310,12 +308,12 @@ export const TrainerDashboardView: React.FC = () => {
                   <span className="text-blue-800 font-bold">Learner Impact</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-extrabold text-slate-900 tabular-nums">{objectivesAttained}</span>
+                  <span className="text-3xl font-extrabold text-slate-900 tabular-nums">{objectivesAttained ?? 'N/A'}</span>
                   <span className="text-xs text-slate-400">/ 5.00</span>
                 </div>
                 <div className="mt-2 text-xs text-blue-800 font-medium flex items-center gap-1">
                   <TrendingUp className="w-3.5 h-3.5" />
-                  <span>98% practical skill comprehension</span>
+                  <span>Calculated from recorded objective responses</span>
                 </div>
               </div>
 
@@ -351,11 +349,14 @@ export const TrainerDashboardView: React.FC = () => {
                       />
                     </div>
                     <div className="flex justify-between items-center text-[11px] text-slate-500 pt-1">
-                      <span>Status: <strong className="text-blue-800">{dim.grade}</strong></span>
-                      <span>Target: ≥{dim.benchmark.toFixed(2)}</span>
+                      <span>Status: <strong className="text-blue-800">{dim.score >= 4 ? 'Meets target' : 'Below target'}</strong></span>
+                      <span>Target: ≥4.00</span>
                     </div>
                   </div>
                 ))}
+                {teachingDimensions.length === 0 && (
+                  <p className="text-sm text-slate-500">No rating responses have been submitted yet.</p>
+                )}
               </div>
             </div>
 
