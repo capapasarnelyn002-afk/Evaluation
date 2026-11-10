@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { app, initializeServer } from '../server.js';
+import { app, getSafeDatabaseInitializationError, initializeServer } from '../server.js';
 
 function sendJson(response: Response, statusCode: number, body: object) {
   response.statusCode = statusCode;
@@ -26,6 +26,6 @@ export default async function handler(req: Request, res: Response) {
       });
       return;
     }
-    sendJson(res, 503, { error: 'The application database is unavailable.' });
+    sendJson(res, 503, { error: getSafeDatabaseInitializationError(error) });
   }
 }

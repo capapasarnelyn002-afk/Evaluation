@@ -2335,11 +2335,12 @@ function restoreServerState(saved: unknown) {
 
 async function supabaseStateRequest(path: string, init?: RequestInit) {
   if (!supabaseUrl || !supabaseSecretKey) {
-    throw new Error('Supabase service credentials are not configured.');
+    throw new Error('Supabase server configuration is missing SUPABASE_URL or a supported service key.');
   }
 
   const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
     ...init,
+    signal: init?.signal || AbortSignal.timeout(8_000),
     headers: {
       apikey: supabaseSecretKey,
       ...(supabaseSecretKey.startsWith('sb_secret_') ? {} : { Authorization: `Bearer ${supabaseSecretKey}` }),
@@ -2349,9 +2350,35 @@ async function supabaseStateRequest(path: string, init?: RequestInit) {
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(`Supabase request failed (${response.status}): ${message}`);
+    throw new SupabaseRequestError(response.status, message);
   }
   return response;
+}
+
+class SupabaseRequestError extends Error {
+  constructor(readonly status: number, readonly responseBody: string) {
+    super(`Supabase request failed (${status}): ${responseBody}`);
+    this.name = 'SupabaseRequestError';
+  }
+}
+
+export function getSafeDatabaseInitializationError(error: unknown) {
+  if (error instanceof Error && error.message.includes('SUPABASE_URL or a supported service key')) {
+    return 'Database server configuration is incomplete. Set SUPABASE_URL and SUPABASE_SECRET_KEY (or a supported service-key alias) in the Vercel environment.';
+  }
+  if (error instanceof SupabaseRequestError) {
+    if (error.status === 401 || error.status === 403) {
+      return 'Supabase rejected the server credentials. Verify the service key and project URL in the Vercel environment.';
+    }
+    if (error.status === 404) {
+      return 'The Supabase application schema is incomplete. Apply the latest supabase/schema.sql and reload the API schema cache.';
+    }
+    return `Supabase could not load application data (HTTP ${error.status}). Check the project database availability.`;
+  }
+  if (error instanceof Error && error.name === 'TimeoutError') {
+    return 'Supabase did not respond before the database request timed out. Check database availability and connection settings.';
+  }
+  return 'The application database is unavailable. Check the Supabase schema and Vercel function logs.';
 }
 
 type SavedConfiguration<T> = {
@@ -2360,74 +2387,69 @@ type SavedConfiguration<T> = {
   updatedAt: string;
 };
 
-async function loadApplicationConfiguration() {
-  const response = await supabaseStateRequest('rpc/load_application_configuration', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: '{}'
-  });
-  const result = await response.json() as {
-    theme?: SavedConfiguration<Record<string, unknown>> | null;
-    systemSettings?: SavedConfiguration<typeof systemSettings> | null;
-  } | null;
-  if (!result || typeof result !== 'object') {
-    throw new Error('Supabase returned an invalid configuration document.');
+async function loadConfigurationRow<T extends object>(
+  table: 'website_themes' | 'system_settings',
+  initialData: T
+): Promise<SavedConfiguration<T>> {
+  const fetchRows = async (includeVersion: boolean) => {
+    const columns = includeVersion ? 'data,version,"updatedAt"' : 'data,"updatedAt"';
+    const path = `${table}?id=eq.default&select=${encodeURIComponent(columns)}`;
+    try {
+      const response = await supabaseStateRequest(path);
+      return await response.json() as Array<{ data?: unknown; version?: unknown; updatedAt?: unknown }>;
+    } catch (error) {
+      if (includeVersion && error instanceof SupabaseRequestError && error.responseBody.includes('version')) {
+        return fetchRows(false);
+      }
+      throw error;
+    }
+  };
+
+  let rows = await fetchRows(true);
+  if (!Array.isArray(rows)) throw new Error(`Supabase returned an invalid ${table} configuration query result.`);
+  if (rows.length === 0) {
+    await supabaseStateRequest(`${table}?on_conflict=id`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=ignore-duplicates,return=minimal'
+      },
+      body: JSON.stringify({ id: 'default', data: initialData })
+    });
+    rows = await fetchRows(true);
   }
 
-  if (!result.theme) {
-    const auditLog = {
-      id: `log-${randomUUID()}`,
-      timestamp: new Date().toISOString(),
-      adminName: 'System',
-      action: 'INITIAL_THEME_CONFIGURATION',
-      resourceId: 'website_theme',
-      reason: 'Initialized the theme row because no saved theme configuration existed.'
-    };
-    try {
-      await saveWebsiteTheme(currentTheme, auditLog, 0);
-    } catch (error) {
-      if (!isConfigurationVersionConflict(error)) throw error;
-    }
-  }
-  if (!result.systemSettings) {
-    const auditLog = {
-      id: `log-${randomUUID()}`,
-      timestamp: new Date().toISOString(),
-      adminName: 'System',
-      action: 'INITIAL_SYSTEM_SETTINGS',
-      resourceId: 'system_settings',
-      reason: 'Initialized settings because no saved system configuration existed.'
-    };
-    try {
-      await saveSystemSettings(systemSettings, auditLog, 0);
-    } catch (error) {
-      if (!isConfigurationVersionConflict(error)) throw error;
-    }
-  }
-  if (!result.theme || !result.systemSettings) return loadApplicationConfiguration();
-
+  const row = rows[0];
   if (
-    !result.theme.data ||
-    typeof result.theme.data !== 'object' ||
-    Array.isArray(result.theme.data) ||
-    !result.systemSettings.data ||
-    typeof result.systemSettings.data !== 'object' ||
-    Array.isArray(result.systemSettings.data) ||
-    !Number.isSafeInteger(result.theme.version) ||
-    !Number.isSafeInteger(result.systemSettings.version) ||
-    typeof result.theme.updatedAt !== 'string' ||
-    typeof result.systemSettings.updatedAt !== 'string'
+    !row ||
+    !row.data ||
+    typeof row.data !== 'object' ||
+    Array.isArray(row.data) ||
+    typeof row.updatedAt !== 'string' ||
+    (row.version !== undefined && !Number.isSafeInteger(row.version))
   ) {
-    throw new Error('Supabase returned an invalid or incomplete saved configuration.');
+    throw new Error(`Supabase returned an invalid ${table} configuration row.`);
   }
 
   return {
-    theme: migrateLegacyTheme(result.theme.data),
-    themeVersion: result.theme.version,
-    themeUpdatedAt: result.theme.updatedAt,
-    systemSettings: result.systemSettings.data,
-    systemSettingsVersion: result.systemSettings.version,
-    systemSettingsUpdatedAt: result.systemSettings.updatedAt
+    data: row.data as T,
+    version: typeof row.version === 'number' ? row.version : 0,
+    updatedAt: row.updatedAt
+  };
+}
+
+async function loadApplicationConfiguration() {
+  const [theme, settings] = await Promise.all([
+    loadConfigurationRow('website_themes', currentTheme),
+    loadConfigurationRow('system_settings', systemSettings)
+  ]);
+  return {
+    theme: migrateLegacyTheme(theme.data as Record<string, unknown>),
+    themeVersion: theme.version,
+    themeUpdatedAt: theme.updatedAt,
+    systemSettings: settings.data,
+    systemSettingsVersion: settings.version,
+    systemSettingsUpdatedAt: settings.updatedAt
   };
 }
 

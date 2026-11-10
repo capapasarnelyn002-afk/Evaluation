@@ -40,7 +40,7 @@ export default async function handler(_request: Request, response: Response) {
   try {
     const snapshotHeaders = new Headers(headers);
     snapshotHeaders.set('Content-Type', 'application/json');
-    const [databaseResponse, snapshotResponse] = await Promise.all([
+    const [databaseResponse, snapshotResponse, themeResponse, settingsResponse] = await Promise.all([
       fetch(`${credentials.projectUrl}/rest/v1/users?select=id&limit=1`, {
         headers,
         signal: AbortSignal.timeout(8_000)
@@ -50,10 +50,18 @@ export default async function handler(_request: Request, response: Response) {
         headers: snapshotHeaders,
         body: '{}',
         signal: AbortSignal.timeout(8_000)
+      }),
+      fetch(`${credentials.projectUrl}/rest/v1/website_themes?id=eq.default&select=data%2C%22updatedAt%22&limit=1`, {
+        headers,
+        signal: AbortSignal.timeout(8_000)
+      }),
+      fetch(`${credentials.projectUrl}/rest/v1/system_settings?id=eq.default&select=data%2C%22updatedAt%22&limit=1`, {
+        headers,
+        signal: AbortSignal.timeout(8_000)
       })
     ]);
 
-    if (databaseResponse.ok && snapshotResponse.ok) {
+    if (databaseResponse.ok && snapshotResponse.ok && themeResponse.ok && settingsResponse.ok) {
       const snapshot = await snapshotResponse.json() as { themePersistenceReady?: boolean };
       if (!snapshot.themePersistenceReady) {
         sendJson(response, 503, {
@@ -66,11 +74,11 @@ export default async function handler(_request: Request, response: Response) {
       return;
     }
 
-    const failedResponse = databaseResponse.ok ? snapshotResponse : databaseResponse;
+    const failedResponse = [databaseResponse, snapshotResponse, themeResponse, settingsResponse].find((item) => !item.ok)!;
     const hint = failedResponse.status === 401 || failedResponse.status === 403
       ? 'Supabase rejected the server key. Confirm it belongs to the project in SUPABASE_URL.'
       : failedResponse.status === 404
-        ? 'The Supabase application schema or load_app_snapshot function was not found. Run the latest supabase/schema.sql in the SQL Editor.'
+        ? 'The Supabase application schema or configuration tables are missing. Run the latest supabase/schema.sql in the SQL Editor.'
         : 'Supabase could not complete the database or application persistence check.';
     console.error(`Supabase database status check failed with HTTP ${failedResponse.status}.`);
     sendJson(response, 503, { connected: false, hint });
