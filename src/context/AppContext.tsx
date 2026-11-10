@@ -52,34 +52,34 @@ export const DEFAULT_THEME: WebsiteTheme = {
   siteName: 'Southern Leyte State University',
   siteTagline: 'Extension Services Evaluation System & Decision Support',
   logoText: 'SLSU-Hinunangan',
-  primaryColor: '#022c22', // emerald-950
-  secondaryColor: '#065f46', // emerald-800
-  accentColor: '#d97706', // amber-600
-  pageBgColor: '#f8fafc', // slate-50
+  primaryColor: '#0056A6',
+  secondaryColor: '#1976D2',
+  accentColor: '#003366',
+  pageBgColor: '#F5F8FC',
   cardBgColor: '#ffffff',
   sidebarBgColor: '#ffffff',
-  sidebarTextColor: '#1e293b',
-  sidebarLogoColor: '#d97706',
-  sidebarLogoBg: '#022c22',
-  sidebarLogoTextColor: '#1e293b',
+  sidebarTextColor: '#1F2937',
+  sidebarLogoColor: '#FFFFFF',
+  sidebarLogoBg: '#0056A6',
+  sidebarLogoTextColor: '#1F2937',
   sidebarLogoType: 'icon',
   sidebarLogoUrl: '',
   sidebarLogoIcon: 'building',
   sidebarLogoShape: 'rounded',
   sidebarLogoHistory: [],
-  sidebarActiveItemBg: '#022c22',
-  sidebarActiveItemText: '#ffffff',
-  sidebarBorderColor: '#e2e8f0',
+  sidebarActiveItemBg: '#EAF3FC',
+  sidebarActiveItemText: '#003366',
+  sidebarBorderColor: '#D9E4F0',
   headerEnabled: true,
-  headerBackgroundColor: '#022c22',
-  headerBgColor: '#022c22',
-  headerTextColor: '#ffffff',
+  headerBackgroundColor: '#FFFFFF',
+  headerBgColor: '#FFFFFF',
+  headerTextColor: '#003366',
   headerFontFamily: 'Inter, system-ui, sans-serif',
   headerFontSize: '0.75rem',
   headerFontWeight: 600,
   headerHeight: '52px',
   headerPadding: '0.5rem 1.5rem',
-  headerBorderColor: 'rgba(255,255,255,0.12)',
+  headerBorderColor: '#D9E4F0',
   headerBorderRadius: '0px',
   headerAlignment: 'space-between',
   headerTitle: '',
@@ -88,14 +88,14 @@ export const DEFAULT_THEME: WebsiteTheme = {
   headerLogoSize: '18px',
   headerLogoPosition: 'left',
   footerEnabled: true,
-  footerBackgroundColor: '#0f172a',
-  footerTextColor: '#cbd5e1',
+  footerBackgroundColor: '#003366',
+  footerTextColor: '#EAF3FC',
   footerFontFamily: 'Inter, system-ui, sans-serif',
   footerFontSize: '0.75rem',
   footerFontWeight: 500,
   footerHeight: 'auto',
   footerPadding: '2rem 1.5rem',
-  footerBorderColor: '#1e293b',
+  footerBorderColor: '#0056A6',
   footerAlignment: 'space-between',
   footerTitle: '',
   footerSubtitle: '',
@@ -105,9 +105,9 @@ export const DEFAULT_THEME: WebsiteTheme = {
   pageContent: {
     dashboard: []
   },
-  buttonPrimaryBg: '#064e3b',
+  buttonPrimaryBg: '#0056A6',
   buttonPrimaryText: '#ffffff',
-  linkTextColor: '#065f46',
+  linkTextColor: '#0056A6',
   fontColorTitle: '#0f172a',
   fontColorHeading: '#1e293b',
   fontColorBody: '#334155',
@@ -140,6 +140,8 @@ interface AppContextType {
   // Navigation & View Layout
   currentView: string;
   setCurrentView: (view: string) => void;
+  goBack: () => void;
+  canGoBack: boolean;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
   mobileMenuOpen: boolean;
@@ -187,7 +189,7 @@ interface AppContextType {
   updateSystemSettings: (settings: Partial<SystemSettings>) => Promise<boolean>;
   systemMetrics: SystemMetrics | null;
   refreshMetrics: () => Promise<void>;
-  refreshAllData: () => Promise<void>;
+  refreshAllData: (silent?: boolean) => Promise<void>;
   isLoading: boolean;
   
   // Toast notifications
@@ -236,7 +238,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const role = currentUser.role;
 
   // Navigation layout state
-  const [currentView, setCurrentView] = useState<string>('overview');
+  const [currentView, setCurrentViewState] = useState<string>('overview');
+  const currentViewRef = React.useRef('overview');
+  const viewHistory = React.useRef<string[]>([]);
+  const setCurrentView = (view: string) => {
+    if (currentViewRef.current !== view) {
+      viewHistory.current.push(currentViewRef.current);
+      window.history.pushState({ slsuView: view }, '', window.location.href);
+    }
+    currentViewRef.current = view;
+    setCurrentViewState(view);
+  };
+  const canGoBack = viewHistory.current.length > 0 || currentView !== 'overview';
+  const goBack = () => {
+    if (viewHistory.current.length > 0) {
+      window.history.back();
+      return;
+    }
+    currentViewRef.current = 'overview';
+    setCurrentViewState('overview');
+  };
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
@@ -294,23 +315,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     root.style.setProperty('--sidebar-logo-text', t.sidebarLogoTextColor || t.sidebarTextColor);
     root.style.setProperty('--sidebar-active-bg', t.sidebarActiveItemBg || t.primaryColor);
     root.style.setProperty('--sidebar-active-text', t.sidebarActiveItemText || '#ffffff');
-    root.style.setProperty('--sidebar-border', t.sidebarBorderColor || '#e2e8f0');
-    root.style.setProperty('--bg-header', t.headerBackgroundColor || t.headerBgColor || '#022c22');
+    root.style.setProperty('--sidebar-border', t.sidebarBorderColor || '#D9E4F0');
+    root.style.setProperty('--bg-header', t.headerBackgroundColor || t.headerBgColor || '#FFFFFF');
     root.style.setProperty('--text-header', t.headerTextColor || '#ffffff');
-    root.style.setProperty('--header-bg', t.headerBackgroundColor || t.headerBgColor || '#022c22');
+    root.style.setProperty('--header-bg', t.headerBackgroundColor || t.headerBgColor || '#FFFFFF');
     root.style.setProperty('--header-text', t.headerTextColor || '#ffffff');
     root.style.setProperty('--header-font', t.headerFontFamily || 'Inter, system-ui, sans-serif');
     root.style.setProperty('--header-font-size', t.headerFontSize || '0.75rem');
     root.style.setProperty('--header-height', t.headerHeight || '52px');
     root.style.setProperty('--header-padding', t.headerPadding || '0.5rem 1.5rem');
-    root.style.setProperty('--header-border', t.headerBorderColor || 'rgba(255,255,255,0.12)');
-    root.style.setProperty('--footer-bg', t.footerBackgroundColor || '#0f172a');
-    root.style.setProperty('--footer-text', t.footerTextColor || '#cbd5e1');
+    root.style.setProperty('--header-border', t.headerBorderColor || '#D9E4F0');
+    root.style.setProperty('--footer-bg', t.footerBackgroundColor || '#003366');
+    root.style.setProperty('--footer-text', t.footerTextColor || '#EAF3FC');
     root.style.setProperty('--footer-font', t.footerFontFamily || 'Inter, system-ui, sans-serif');
     root.style.setProperty('--footer-font-size', t.footerFontSize || '0.75rem');
     root.style.setProperty('--footer-height', t.footerHeight || 'auto');
     root.style.setProperty('--footer-padding', t.footerPadding || '2rem 1.5rem');
-    root.style.setProperty('--footer-border', t.footerBorderColor || '#1e293b');
+    root.style.setProperty('--footer-border', t.footerBorderColor || '#0056A6');
     root.style.setProperty('--btn-primary-bg', t.buttonPrimaryBg);
     root.style.setProperty('--btn-primary-text', t.buttonPrimaryText);
     root.style.setProperty('--color-link', t.linkTextColor);
@@ -348,6 +369,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     applyThemeToDOM(theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!window.history.state?.slsuView) {
+      window.history.replaceState({ ...(window.history.state || {}), slsuView: 'overview' }, '', window.location.href);
+    }
+    const handlePopState = (event: PopStateEvent) => {
+      const previousView = event.state?.slsuView;
+      if (typeof previousView === 'string') {
+        currentViewRef.current = previousView;
+        setCurrentViewState(previousView);
+        viewHistory.current.pop();
+      } else {
+        currentViewRef.current = 'overview';
+        setCurrentViewState('overview');
+        viewHistory.current = [];
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {
     setToasts(prev => {
@@ -467,7 +508,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSurveys([]);
     setAuditLogs([]);
     setSystemMetrics(null);
-    setCurrentView('overview');
+    viewHistory.current = [];
+    currentViewRef.current = 'overview';
+    setCurrentViewState('overview');
     addToast({ type: 'info', title: 'Signed Out', description: 'Your session has ended.' });
   };
 
@@ -869,8 +912,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Load all initial data from backend API
-  const refreshAllData = async () => {
-    setIsLoading(true);
+  const refreshAllData = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const [commonResults, adminResults] = await Promise.all([
         Promise.allSettled([
@@ -925,7 +968,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       console.error('Failed to load application data from the database:', err);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -1018,6 +1061,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (isAuthenticated) void refreshAllData();
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || role !== 'admin') return;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshAllData(true);
+    };
+    const timer = window.setInterval(refreshWhenVisible, 30_000);
+    window.addEventListener('focus', refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshWhenVisible);
+    };
+  }, [isAuthenticated, role]);
 
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_QUEUE_KEY, JSON.stringify(offlineQueue));
@@ -1269,6 +1325,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         currentView,
         setCurrentView,
+        goBack,
+        canGoBack,
         sidebarCollapsed,
         setSidebarCollapsed,
         mobileMenuOpen,

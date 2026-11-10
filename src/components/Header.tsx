@@ -32,7 +32,7 @@ export const Header: React.FC = () => {
       <div
         className="border-b"
         style={{
-          backgroundColor: theme.headerBackgroundColor || theme.headerBgColor || '#022c22',
+          backgroundColor: theme.headerBackgroundColor || theme.headerBgColor || '#0056A6',
           color: theme.headerTextColor || '#ffffff',
           borderColor: theme.headerBorderColor || 'rgba(255,255,255,0.12)',
           minHeight: theme.headerHeight || '52px',
@@ -49,8 +49,8 @@ export const Header: React.FC = () => {
             <div 
               className="w-9 h-9 rounded-lg flex items-center justify-center shadow-xs shrink-0 overflow-hidden"
               style={{
-                backgroundColor: theme.sidebarLogoBg || '#022c22',
-                color: theme.sidebarLogoColor || '#d97706'
+                backgroundColor: theme.sidebarLogoBg || '#0056A6',
+                color: theme.sidebarLogoColor || '#FFFFFF'
               }}
             >
               {theme.sidebarLogoType === 'image' && theme.sidebarLogoUrl ? (
@@ -68,7 +68,7 @@ export const Header: React.FC = () => {
               <a
                 href="#"
                 onClick={(e) => e.preventDefault()}
-                className="text-base font-bold tracking-tight text-slate-900 whitespace-nowrap hover:text-emerald-900 transition-colors"
+                className="text-base font-bold tracking-tight text-slate-900 whitespace-nowrap hover:text-blue-900 transition-colors"
               >
                 SLSU Extension Evaluation
               </a>
@@ -84,7 +84,7 @@ export const Header: React.FC = () => {
               {role === 'admin' ? <ShieldCheck className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
               <span>{currentUser.name}</span>
             </span>
-            <button onClick={() => void logout()} className="text-emerald-900 hover:underline">
+            <button onClick={() => void logout()} className="text-blue-900 hover:underline">
               Sign out
             </button>
           </nav>
@@ -98,7 +98,7 @@ export const Header: React.FC = () => {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
                 isOfflineMode
                   ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
-                  : 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+                  : 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100'
               }`}
               title={isOfflineMode ? 'Field mode active. Click to switch to online.' : 'Online connected. Click to simulate field offline mode.'}
             >
@@ -109,7 +109,7 @@ export const Header: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <Wifi className="w-3.5 h-3.5 text-emerald-700" />
+                  <Wifi className="w-3.5 h-3.5 text-blue-700" />
                   <span className="hidden sm:inline">Online Sync</span>
                 </>
               )}
@@ -147,7 +147,7 @@ export const Header: React.FC = () => {
           <p className="px-2 pt-1 font-semibold text-slate-700">{currentUser.name}</p>
           <button
             onClick={() => { void logout(); setMobileMenuOpen(false); }}
-            className="w-full text-left px-3 py-2 text-emerald-900 hover:bg-slate-50"
+            className="w-full text-left px-3 py-2 text-blue-900 hover:bg-slate-50"
           >
             Sign out
           </button>

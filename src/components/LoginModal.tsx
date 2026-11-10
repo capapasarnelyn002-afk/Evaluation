@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Building2, KeyRound, Lock } from 'lucide-react';
+import { ArrowLeft, Building2, KeyRound, Lock } from 'lucide-react';
 import { DatabaseStatusIndicator } from './DatabaseStatusIndicator';
 
 export const LoginModal: React.FC = () => {
@@ -35,23 +35,23 @@ export const LoginModal: React.FC = () => {
     <main className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-950 text-amber-400 shadow-lg">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0056A6] text-white shadow-lg">
             <Building2 className="h-7 w-7" />
           </div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-800">Southern Leyte State University</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-800">Southern Leyte State University</p>
           <h1 className="mt-2 text-2xl font-bold text-slate-900">Extension Evaluation System</h1>
-          <p className="mt-2 text-sm text-slate-600">Sign in with your registered account to continue.</p>
+          <p className="mt-2 text-sm text-slate-600">Administrator sign-in is required to manage evaluation activities and results.</p>
         </div>
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
           <div className="border-b border-slate-100 px-6 py-5">
             <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800">
+              <div className="rounded-lg bg-blue-50 p-2 text-blue-800">
                 <KeyRound className="h-5 w-5" />
               </div>
               <div>
                 <h2 className="font-bold text-slate-900">Welcome back</h2>
-                <p className="text-xs text-slate-500">Use your email and password, or continue with Google.</p>
+                <p className="text-xs text-slate-500">Use your administrator account and password, or continue with Google.</p>
               </div>
             </div>
           </div>
@@ -68,7 +68,7 @@ export const LoginModal: React.FC = () => {
               autoComplete="username"
               value={inputEmail}
               onChange={event => { setInputEmail(event.target.value); setErrorMessage(''); clearLoginError(); }}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20"
             />
           </div>
           <div>
@@ -82,7 +82,7 @@ export const LoginModal: React.FC = () => {
               autoComplete="current-password"
               value={inputPassword}
               onChange={event => { setInputPassword(event.target.value); setErrorMessage(''); clearLoginError(); }}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20"
             />
           </div>
           {(errorMessage || loginError) && (
@@ -93,7 +93,7 @@ export const LoginModal: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-900 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-950 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-900 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-blue-950 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Lock className="w-4 h-4" />
             {isSubmitting ? 'Signing in...' : 'Sign in'}
@@ -119,6 +119,9 @@ export const LoginModal: React.FC = () => {
         <div className="mt-4 flex justify-center">
           <DatabaseStatusIndicator showHint />
         </div>
+        <a href="/evaluate" className="mx-auto mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#D9E4F0] bg-white px-4 text-sm font-semibold text-[#003366] hover:bg-[#EAF3FC]">
+          <ArrowLeft className="h-4 w-4" /> Public evaluation forms
+        </a>
         <p className="mt-6 text-center text-xs text-slate-500">Authorized users only · Your session is securely verified.</p>
       </div>
     </main>

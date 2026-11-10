@@ -294,7 +294,7 @@ export const AdminDashboard: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setShowNewActivityModal(true)}
-            className="px-3.5 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            className="px-3.5 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Register Activity</span>
@@ -356,7 +356,7 @@ export const AdminDashboard: React.FC = () => {
               : 'hover:text-slate-900'
           }`}
         >
-          <FileText className="w-3.5 h-3.5 text-emerald-800" />
+          <FileText className="w-3.5 h-3.5 text-blue-800" />
           <span>AI Executive Reports</span>
         </button>
 
@@ -407,7 +407,7 @@ export const AdminDashboard: React.FC = () => {
           <select
             value={selectedActivityFilter}
             onChange={(e) => setSelectedActivityFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-slate-900 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-700"
+            className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-slate-900 font-medium focus:outline-none focus:ring-1 focus:ring-blue-700"
           >
             <option value="all">All Extension Activities Combined ({evaluations.length} records)</option>
             {activities.map(a => (
@@ -435,13 +435,13 @@ export const AdminDashboard: React.FC = () => {
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
               <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
                 <span className="font-semibold uppercase tracking-wider">Overall Mean Rating</span>
-                <span className="text-emerald-800 font-medium">Target: ≥4.00</span>
+                <span className="text-blue-800 font-medium">Target: ≥4.00</span>
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-extrabold text-slate-900 tabular-nums">{overallMean}</span>
                 <span className="text-xs text-slate-400">/ 5.00</span>
               </div>
-              <div className="mt-2 text-xs text-emerald-800 font-medium flex items-center gap-1">
+              <div className="mt-2 text-xs text-blue-800 font-medium flex items-center gap-1">
                 <TrendingUp className="w-3.5 h-3.5" />
                 <span>Exceeds Institutional Benchmark</span>
               </div>
@@ -485,7 +485,7 @@ export const AdminDashboard: React.FC = () => {
                 <span className="text-3xl font-extrabold text-slate-900 tabular-nums">{onlineCount}</span>
                 <span className="text-xs text-slate-500 tabular-nums">Online / {offlineCount} Field Synced</span>
               </div>
-              <div className="mt-2 text-xs text-emerald-800 font-medium flex items-center gap-1">
+              <div className="mt-2 text-xs text-blue-800 font-medium flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>100% duplicate verified</span>
               </div>
@@ -526,7 +526,7 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
                       <div
-                        className="bg-emerald-800 h-full rounded-full transition-all duration-500"
+                        className="bg-blue-800 h-full rounded-full transition-all duration-500"
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
@@ -578,7 +578,7 @@ export const AdminDashboard: React.FC = () => {
                         <td className="px-4 py-3.5 text-center font-bold text-slate-800 tabular-nums">
                           {actEvals.length} / {act.totalTargetParticipants}
                         </td>
-                        <td className="px-4 py-3.5 text-center font-bold text-emerald-900 tabular-nums">
+                        <td className="px-4 py-3.5 text-center font-bold text-blue-900 tabular-nums">
                           {avg !== null ? `${avg.toFixed(2)} ★` : '—'}
                         </td>
                         <td className="px-4 py-3.5 text-slate-600">{act.leadCoordinator}</td>
@@ -610,7 +610,7 @@ export const AdminDashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-xs font-semibold text-emerald-900">Positive Feedback</span>
+                <span className="text-xs font-semibold text-blue-900">Positive Feedback</span>
                 <div className="flex items-baseline justify-between mt-1">
                   <span className="text-2xl font-bold text-slate-900 tabular-nums">{positiveSentimentCount}</span>
                   <span className="text-xs text-slate-500 tabular-nums">
@@ -643,7 +643,7 @@ export const AdminDashboard: React.FC = () => {
             {/* Clean Polarity Split Bar */}
             <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden flex">
               <div
-                className="bg-emerald-700 h-full transition-all"
+                className="bg-blue-700 h-full transition-all"
                 style={{ width: `${totalEvaluationsCount > 0 ? (positiveSentimentCount / totalEvaluationsCount) * 100 : 80}%` }}
                 title="Positive"
               />
@@ -689,7 +689,7 @@ export const AdminDashboard: React.FC = () => {
                     onClick={() => setSelectedTopicFilter(key)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer flex items-center gap-1.5 ${
                       selectedTopicFilter === key
-                        ? 'bg-emerald-900 text-white border-emerald-900'
+                        ? 'bg-blue-900 text-white border-blue-900'
                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                     }`}
                   >
@@ -737,14 +737,14 @@ export const AdminDashboard: React.FC = () => {
                         ? `${e.participantName.charAt(0)}*** ${e.participantName.split(' ')[1] ? e.participantName.split(' ')[1].charAt(0) + '***' : ''}`
                         : e.participantName}
                     </span>
-                    <span className="font-bold text-emerald-900 tabular-nums">
+                    <span className="font-bold text-blue-900 tabular-nums">
                       {e.meanRating.toFixed(2)} ★
                     </span>
                   </div>
 
                   {e.comments.strengths && (
                     <div className="text-xs">
-                      <span className="text-emerald-900 font-semibold block mb-0.5">Strengths:</span>
+                      <span className="text-blue-900 font-semibold block mb-0.5">Strengths:</span>
                       <p className="text-slate-700 italic">"{e.comments.strengths}"</p>
                     </div>
                   )}
@@ -803,12 +803,12 @@ export const AdminDashboard: React.FC = () => {
                 value={quickQuestion}
                 onChange={(e) => setQuickQuestion(e.target.value)}
                 placeholder="e.g. What were the most recurring participant suggestions regarding starter kits and materials?"
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
                 type="submit"
                 disabled={isAskingAi}
-                className="px-5 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+                className="px-5 py-2.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
               >
                 {isAskingAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 <span>{isAskingAi ? 'Querying...' : 'Ask AI'}</span>
@@ -850,7 +850,7 @@ export const AdminDashboard: React.FC = () => {
                 <button
                   onClick={handleGenerateReport}
                   disabled={isGeneratingReport}
-                  className="px-4 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {isGeneratingReport ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-400" />}
                   <span>{isGeneratingReport ? 'Synthesizing...' : 'Generate Executive Report'}</span>
@@ -879,7 +879,7 @@ export const AdminDashboard: React.FC = () => {
 
                 {/* University Header */}
                 <div className="text-center pb-4 border-b border-slate-200">
-                  <h4 className="text-xs uppercase font-extrabold tracking-widest text-emerald-950">
+                  <h4 className="text-xs uppercase font-extrabold tracking-widest text-blue-950">
                     Southern Leyte State University - Hinunangan Campus
                   </h4>
                   <p className="text-xs text-slate-600 font-medium">
@@ -911,7 +911,7 @@ export const AdminDashboard: React.FC = () => {
                         <span className="text-[11px] font-medium text-slate-500 block mb-1">{kpi.metric}</span>
                         <div className="flex items-baseline justify-between">
                           <span className="text-lg font-bold text-slate-900 tabular-nums">{kpi.value}</span>
-                          <span className="text-[10px] font-semibold text-emerald-800">
+                          <span className="text-[10px] font-semibold text-blue-800">
                             {kpi.status}
                           </span>
                         </div>
@@ -924,8 +924,8 @@ export const AdminDashboard: React.FC = () => {
                 {/* 3. Strengths and Weaknesses */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-white p-4 rounded-lg border border-slate-200">
-                    <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-900 mb-3 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-blue-900 mb-3 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-blue-700" />
                       <span>Validated Strengths & Commendations</span>
                     </h4>
                     <div className="space-y-3">
@@ -933,7 +933,7 @@ export const AdminDashboard: React.FC = () => {
                         <div key={idx} className="p-3 rounded-lg bg-slate-50 text-xs">
                           <span className="font-bold text-slate-900 block">{str.topic}</span>
                           <p className="text-slate-700 mt-1">{str.summary}</p>
-                          <span className="text-[10px] text-emerald-800 font-semibold mt-1 inline-block">
+                          <span className="text-[10px] text-blue-800 font-semibold mt-1 inline-block">
                             Ratio: {str.sentimentRatio}
                           </span>
                         </div>
@@ -984,7 +984,7 @@ export const AdminDashboard: React.FC = () => {
                             <td className="p-3 font-semibold text-slate-800">{rec.category}</td>
                             <td className="p-3 text-slate-700">{rec.recommendation}</td>
                             <td className="p-3 text-slate-600">{rec.expectedImpact}</td>
-                            <td className="p-3 font-medium text-emerald-900">{rec.responsibleUnit}</td>
+                            <td className="p-3 font-medium text-blue-900">{rec.responsibleUnit}</td>
                             <td className="p-3 text-center font-bold text-slate-900">
                               {rec.priority}
                             </td>
@@ -1032,7 +1032,7 @@ export const AdminDashboard: React.FC = () => {
                 </p>
                 <button
                   onClick={handleGenerateReport}
-                  className="px-4 py-2 bg-emerald-900 text-white rounded-lg text-xs font-bold hover:bg-emerald-950 cursor-pointer"
+                  className="px-4 py-2 bg-blue-900 text-white rounded-lg text-xs font-bold hover:bg-blue-950 cursor-pointer"
                 >
                   Synthesize Report Now
                 </button>
@@ -1068,7 +1068,7 @@ export const AdminDashboard: React.FC = () => {
                 onClick={() => setMaskPII(!maskPII)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-colors cursor-pointer text-xs"
               >
-                {maskPII ? <EyeOff className="w-3.5 h-3.5 text-emerald-800" /> : <Eye className="w-3.5 h-3.5 text-slate-500" />}
+                {maskPII ? <EyeOff className="w-3.5 h-3.5 text-blue-800" /> : <Eye className="w-3.5 h-3.5 text-slate-500" />}
                 <span>{maskPII ? 'RA 10173 PII Masked' : 'PII Visible'}</span>
               </button>
             </div>
@@ -1184,7 +1184,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
             <button
               onClick={() => setShowNewActivityModal(true)}
-              className="px-3.5 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Create Activity</span>
@@ -1199,7 +1199,7 @@ export const AdminDashboard: React.FC = () => {
               return (
                 <div key={act.id} className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-3">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-xs font-semibold text-emerald-900 capitalize">
+                    <span className="text-xs font-semibold text-blue-900 capitalize">
                       {act.activityType.replace('_', ' ')} Program
                     </span>
                     <span className="text-[11px] uppercase font-bold text-slate-500">
@@ -1232,7 +1232,7 @@ export const AdminDashboard: React.FC = () => {
                       </div>
                       <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                         <div
-                          className="bg-emerald-800 h-full rounded-full transition-all"
+                          className="bg-blue-800 h-full rounded-full transition-all"
                           style={{ width: `${progressPct}%` }}
                         />
                       </div>
@@ -1253,7 +1253,7 @@ export const AdminDashboard: React.FC = () => {
 
           <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
             <div className="flex items-start gap-3">
-              <ShieldCheck className="w-5 h-5 text-emerald-800 shrink-0 mt-0.5" />
+              <ShieldCheck className="w-5 h-5 text-blue-800 shrink-0 mt-0.5" />
               <div>
                 <h3 className="font-bold text-sm text-slate-900">
                   Data Privacy Act of 2012 (RA 10173) Compliance & Access Governance
@@ -1290,7 +1290,7 @@ export const AdminDashboard: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 font-semibold text-slate-900">{log.adminName}</td>
                       <td className="px-4 py-3 font-mono text-[11px] text-slate-700">{log.action}</td>
-                      <td className="px-4 py-3 font-mono text-emerald-900 font-semibold">{log.participantControlNumber || '—'}</td>
+                      <td className="px-4 py-3 font-mono text-blue-900 font-semibold">{log.participantControlNumber || '—'}</td>
                       <td className="px-4 py-3 text-slate-600 max-w-sm">{log.reason}</td>
                     </tr>
                   ))}
@@ -1325,7 +1325,7 @@ export const AdminDashboard: React.FC = () => {
                 value={unmaskReason}
                 onChange={(e) => setUnmaskReason(e.target.value)}
                 placeholder="e.g. Following up on participant grievance regarding seminar equipment / health mission inquiry..."
-                className="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                className="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-700"
               />
             </div>
 
@@ -1341,7 +1341,7 @@ export const AdminDashboard: React.FC = () => {
                 type="button"
                 disabled={!unmaskReason.trim()}
                 onClick={handleConfirmUnmask}
-                className="px-4 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs cursor-pointer disabled:opacity-50"
               >
                 Log Access & Unmask
               </button>
@@ -1358,7 +1358,7 @@ export const AdminDashboard: React.FC = () => {
               Update Administrator Follow-Up
             </h3>
             <p className="text-xs text-slate-500">
-              Control Number: <strong className="text-emerald-950">{statusTarget.controlNumber}</strong>
+              Control Number: <strong className="text-blue-950">{statusTarget.controlNumber}</strong>
             </p>
 
             <div>
@@ -1399,7 +1399,7 @@ export const AdminDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={handleSaveStatus}
-                className="px-4 py-2 rounded-lg bg-emerald-900 text-white font-bold text-xs hover:bg-emerald-950 cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-blue-900 text-white font-bold text-xs hover:bg-blue-950 cursor-pointer"
               >
                 Save Status
               </button>
@@ -1513,7 +1513,7 @@ export const AdminDashboard: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-emerald-900 text-white font-bold hover:bg-emerald-950"
+                  className="px-4 py-2 rounded-lg bg-blue-900 text-white font-bold hover:bg-blue-950"
                 >
                   Register Activity
                 </button>

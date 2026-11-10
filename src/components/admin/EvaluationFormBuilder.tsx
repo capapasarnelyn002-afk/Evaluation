@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { EvaluationForm, FormSection, FormQuestion, QuestionType } from '../../types';
 import { EvaluationPrintDocument, startEvaluationPrint } from '../EvaluationPrintDocument';
 import { EvaluationXlsxImportModal } from './EvaluationXlsxImportModal';
+import { makeEvaluationQrDataUrl } from '../PublicEvaluationView';
 import { 
   Plus, 
   Trash2, 
@@ -10,6 +11,7 @@ import {
   Copy, 
   Eye, 
   Save, 
+  ArrowLeft,
   ArrowUp, 
   ArrowDown, 
   CheckCircle2, 
@@ -40,6 +42,8 @@ export const EvaluationFormBuilder: React.FC = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [printForm, setPrintForm] = useState<EvaluationForm | null>(null);
   const [printPaper, setPrintPaper] = useState<'A4' | 'Letter'>('A4');
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [publicLinkCopied, setPublicLinkCopied] = useState(false);
 
   useEffect(() => {
     if (!printForm) return;
@@ -79,6 +83,36 @@ export const EvaluationFormBuilder: React.FC = () => {
 
   // Selected or active form
   const currentForm = editingForm || forms.find(f => f.id === activeFormId) || forms[0];
+  const publicLink = currentForm ? `${window.location.origin}/evaluate/${encodeURIComponent(currentForm.id)}` : '';
+
+  const handleCopyPublicLink = async () => {
+    try {
+      await navigator.clipboard.writeText(publicLink);
+      setPublicLinkCopied(true);
+      window.setTimeout(() => setPublicLinkCopied(false), 1800);
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Link Not Copied',
+        description: error instanceof Error ? error.message : 'Clipboard access is unavailable in this browser.'
+      });
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    if (!currentForm || currentForm.status !== 'published' || currentForm.publicEnabled === false || isCreatingNewForm) {
+      setQrDataUrl('');
+      return;
+    }
+    void makeEvaluationQrDataUrl(`${window.location.origin}/evaluate/${encodeURIComponent(currentForm.id)}`)
+      .then(dataUrl => { if (active) setQrDataUrl(dataUrl); })
+      .catch(error => {
+        console.error('Could not generate the evaluation QR code:', error);
+        if (active) setQrDataUrl('');
+      });
+    return () => { active = false; };
+  }, [currentForm?.id, currentForm?.status, currentForm?.publicEnabled, isCreatingNewForm]);
 
   useEffect(() => {
     if (!editingForm && !activeFormId && forms.length > 0) setActiveFormId(forms[0].id);
@@ -127,6 +161,11 @@ export const EvaluationFormBuilder: React.FC = () => {
     }
     if (formToSave.status === 'published' && !formToSave.sections.some(section => section.questions.length > 0)) {
       setFormSaveError('Add at least one question before publishing this form.');
+      setSaveStatus('failed');
+      return;
+    }
+    if (formToSave.status === 'published' && !formToSave.activityId && !activities.some(activity => activity.assignedFormId === formToSave.id)) {
+      setFormSaveError('Assign this form to an extension activity before publishing it.');
       setSaveStatus('failed');
       return;
     }
@@ -181,6 +220,32 @@ export const EvaluationFormBuilder: React.FC = () => {
     setSaveStatus('saved');
     setFormSaveError('');
     setActiveFormId(forms[0]?.id || '');
+  };
+
+  const handleBackToBuilder = async () => {
+    const formToSave = editingForm;
+    if (!formToSave) return;
+    if (hasUnsavedChanges) {
+      setIsSavingForm(true);
+      setSaveStatus('saving');
+      try {
+        const savedForm = isCreatingNewForm
+          ? await createForm({ ...formToSave, id: undefined, status: 'draft' })
+          : await updateForm(formToSave.id, formToSave);
+        setActiveFormId(savedForm.id);
+        setIsCreatingNewForm(false);
+      } catch (cause) {
+        setFormSaveError(cause instanceof Error ? cause.message : 'The form could not be saved. Your edits are still open.');
+        setSaveStatus('failed');
+        return;
+      } finally {
+        setIsSavingForm(false);
+      }
+    }
+    setEditingForm(null);
+    setHasUnsavedChanges(false);
+    setSaveStatus('saved');
+    setFormSaveError('');
   };
 
   const handleAddSection = () => {
@@ -371,7 +436,7 @@ export const EvaluationFormBuilder: React.FC = () => {
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div>
             <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-              <Layers className="w-5 h-5 text-emerald-800" />
+              <Layers className="w-5 h-5 text-blue-800" />
               <span>Evaluation Form Builder & Rubric Customizer</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -420,16 +485,16 @@ export const EvaluationFormBuilder: React.FC = () => {
         </div>
 
         {editingForm && (
-          <div className="flex flex-col gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-700">
-              <button type="button" className="px-2.5 py-1.5 rounded border border-slate-300 bg-white text-slate-700">Back to Form Builder</button>
+              <button type="button" onClick={() => void handleBackToBuilder()} disabled={isSavingForm} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-slate-300 bg-white text-slate-700 disabled:opacity-50"><ArrowLeft className="h-3.5 w-3.5" />Back to Form Builder</button>
               <button type="button" className="px-2.5 py-1.5 rounded border border-slate-300 bg-white text-slate-700">Theme</button>
               <button type="button" className="px-2.5 py-1.5 rounded border border-slate-300 bg-white text-slate-700">Settings</button>
               <button type="button" onClick={() => setShowPreviewModal(true)} className="px-2.5 py-1.5 rounded border border-slate-300 bg-white text-slate-700">Preview</button>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-700">
               <span className="font-semibold">Save status:</span>
-              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-bold ${saveStatus === 'saving' ? 'bg-amber-100 text-amber-800' : saveStatus === 'failed' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
+              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-bold ${saveStatus === 'saving' ? 'bg-amber-100 text-amber-800' : saveStatus === 'failed' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'}`}>
                 <span className="h-2 w-2 rounded-full bg-current" />
                 {saveStatusLabel}
               </span>
@@ -440,7 +505,7 @@ export const EvaluationFormBuilder: React.FC = () => {
 
       {!currentForm && (
         <section className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-xs">
-          <Layers className="mx-auto h-10 w-10 text-emerald-800" />
+          <Layers className="mx-auto h-10 w-10 text-blue-800" />
           <h3 className="mt-3 text-base font-bold text-slate-900">{isLoading ? 'Loading evaluation forms' : 'No evaluation forms yet'}</h3>
           <p className="mx-auto mt-1 max-w-lg text-xs text-slate-600">
             {isLoading ? 'The form list is loading from the server.' : 'Create your first form or import an Excel questionnaire to start building a respondent-ready evaluation.'}
@@ -476,7 +541,7 @@ export const EvaluationFormBuilder: React.FC = () => {
             >
               <span>{f.title}</span>
               <span className={`text-[10px] uppercase font-bold px-1.5 py-0.2 rounded ${
-                f.status === 'published' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-600'
+                f.status === 'published' ? 'bg-blue-100 text-blue-900' : 'bg-slate-100 text-slate-600'
               }`}>
                 {f.status}
               </span>
@@ -578,6 +643,15 @@ export const EvaluationFormBuilder: React.FC = () => {
                       </select>
                     </div>
                   </div>
+                  <div className="grid gap-3 rounded-lg border border-[#D9E4F0] bg-[#F5F8FC] p-3 sm:grid-cols-2">
+                    <label className="text-[11px] font-semibold text-slate-700">Public form expiration (optional)
+                      <input type="date" value={editingForm.expiresAt || ''} onChange={event => { setEditingForm({ ...editingForm, expiresAt: event.target.value || null }); setHasUnsavedChanges(true); setSaveStatus('saving'); }} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-normal" />
+                    </label>
+                    <label className="flex min-h-10 items-center gap-2 self-end text-xs font-semibold text-slate-700">
+                      <input type="checkbox" checked={editingForm.publicEnabled !== false} onChange={event => { setEditingForm({ ...editingForm, publicEnabled: event.target.checked }); setHasUnsavedChanges(true); setSaveStatus('saving'); }} className="h-4 w-4 accent-[#0056A6]" />
+                      Accept public submissions
+                    </label>
+                  </div>
                 </div>
               ) : (
                 <div>
@@ -586,7 +660,7 @@ export const EvaluationFormBuilder: React.FC = () => {
                   <div className="flex items-center gap-3 text-xs text-slate-500 mt-3">
                     <span>Version: <strong>v{currentForm.version}</strong></span>
                     <span>·</span>
-                    <span>Status: <strong className="uppercase text-emerald-800">{currentForm.status}</strong></span>
+                    <span>Status: <strong className="uppercase text-blue-800">{currentForm.status}</strong></span>
                     <span>·</span>
                     <span>Total Sections: <strong>{currentForm.sections.length}</strong></span>
                   </div>
@@ -620,14 +694,14 @@ export const EvaluationFormBuilder: React.FC = () => {
                     type="button"
                     onClick={() => void handleSaveForm(true)}
                     disabled={isSavingForm}
-                    className="px-4 py-2 rounded-lg border border-emerald-800 bg-emerald-50 text-emerald-900 font-bold text-xs disabled:opacity-50"
+                    className="px-4 py-2 rounded-lg border border-blue-800 bg-blue-50 text-blue-900 font-bold text-xs disabled:opacity-50"
                   >Publish</button>}
                 </>
               ) : (
                 <>
                   <button
                     onClick={() => handleStartEditForm(currentForm)}
-                    className="px-3.5 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-xs border border-emerald-300 flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-xs border border-blue-300 flex items-center gap-1.5 cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>Edit Form Rubric</span>
@@ -659,6 +733,31 @@ export const EvaluationFormBuilder: React.FC = () => {
             </div>
           </div>
 
+          {currentForm.status === 'published' && !isCreatingNewForm && (
+            <section className="grid gap-4 rounded-xl border border-[#D9E4F0] bg-[#F5F8FC] p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+              <div className="min-w-0">
+                <h3 className="font-bold text-[#003366]">Public evaluation link</h3>
+                <p className="mt-1 text-xs text-slate-600">Share this link or its QR code with participants. No participant account is required.</p>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input aria-label="Public evaluation link" readOnly value={publicLink} className="min-w-0 flex-1 rounded-lg border border-[#D9E4F0] bg-white px-3 py-2 text-xs text-slate-700" />
+                  <button type="button" onClick={() => void handleCopyPublicLink()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#0056A6] px-3 text-xs font-bold text-white hover:bg-[#003366]">
+                    {publicLinkCopied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{publicLinkCopied ? 'Copied' : 'Copy link'}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-slate-600">
+                  Submissions recorded: {activities.find(activity => activity.id === currentForm.activityId || activity.assignedFormId === currentForm.id)?.evaluatedParticipants || 0}
+                  {currentForm.publicEnabled === false && <span className="ml-2 font-semibold text-rose-700">Public submissions disabled</span>}
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                {qrDataUrl && currentForm.publicEnabled !== false
+                  ? <img src={qrDataUrl} alt={`QR code for ${currentForm.title}`} className="h-36 w-36 rounded-lg border border-[#D9E4F0] bg-white p-2" />
+                  : <div className="flex h-36 w-36 items-center justify-center rounded-lg border border-dashed border-[#D9E4F0] bg-white px-3 text-center text-xs text-slate-500">Enable submissions to generate a QR code.</div>}
+                <a href={publicLink} target="_blank" rel="noreferrer" className="text-xs font-semibold text-[#0056A6] underline">Preview public form</a>
+              </div>
+            </section>
+          )}
+
           {/* Form Sections & Questions List */}
           <div className="space-y-6">
             {editingForm && formSaveError && <p role="alert" className="rounded border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900">{formSaveError}</p>}
@@ -687,7 +786,7 @@ export const EvaluationFormBuilder: React.FC = () => {
                         onClick={() => openAddQuestion(sec.id)}
                         className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs border border-slate-200 flex items-center gap-1 cursor-pointer"
                       >
-                        <Plus className="w-3.5 h-3.5 text-emerald-700" />
+                        <Plus className="w-3.5 h-3.5 text-blue-700" />
                         <span>Add Question</span>
                       </button>
                       <button
@@ -723,7 +822,7 @@ export const EvaluationFormBuilder: React.FC = () => {
                               {q.type.replace('_', ' ')}
                             </span>
                           </div>
-                          {q.criterionName && <p className="text-[11px] font-semibold text-emerald-900">Criterion: {q.criterionName}</p>}
+                          {q.criterionName && <p className="text-[11px] font-semibold text-blue-900">Criterion: {q.criterionName}</p>}
                           {q.description && (
                             <p className="text-[11px] text-slate-500">{q.description}</p>
                           )}
@@ -953,7 +1052,7 @@ export const EvaluationFormBuilder: React.FC = () => {
                   checked={qType === 'instructions' ? false : qRequired}
                   disabled={qType === 'instructions'}
                   onChange={(e) => setQRequired(e.target.checked)}
-                  className="rounded text-emerald-800"
+                  className="rounded text-blue-800"
                 />
                 <label htmlFor="reqCheck" className="font-semibold text-slate-800">
                   Mark question as required (evaluators cannot submit without answering)
@@ -1018,14 +1117,14 @@ export const EvaluationFormBuilder: React.FC = () => {
                         {q.description && (
                           <p className="text-[11px] text-slate-500">{q.description}</p>
                         )}
-                        {q.criterionName && <p className="text-[11px] font-semibold text-emerald-900">Criterion: {q.criterionName}</p>}
+                        {q.criterionName && <p className="text-[11px] font-semibold text-blue-900">Criterion: {q.criterionName}</p>}
 
                         {(q.type === 'rating_scale' || q.type === 'star_rating' || q.type === 'likert_scale') && (
                           <div className="flex items-center justify-between gap-2 pt-1">
                             <span className="text-[10px] text-slate-400">{q.scaleMinLabel || 'Low'}</span>
                             <div className="flex gap-2">
                               {Array.from({ length: Math.min(10, Math.max(2, (q.scaleMax || 5) - (q.scaleMin || 1) + 1)) }, (_, index) => (q.scaleMin || 1) + index).map(v => (
-                                <button key={v} type="button" className="w-8 h-8 rounded-full border border-slate-300 font-bold hover:bg-emerald-50">
+                                <button key={v} type="button" className="w-8 h-8 rounded-full border border-slate-300 font-bold hover:bg-blue-50">
                                   {q.type === 'likert_scale' ? q.scaleLabels?.[v - (q.scaleMin || 1)] || v : v}
                                 </button>
                               ))}
@@ -1038,7 +1137,7 @@ export const EvaluationFormBuilder: React.FC = () => {
                           <div className="space-y-1.5 pt-1">
                             {(q.type === 'yes_no' ? ['Yes', 'No'] : q.options || []).map((opt, oIdx) => (
                               <label key={oIdx} className="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" name={q.id} className="text-emerald-800" />
+                                <input type="radio" name={q.id} className="text-blue-800" />
                                 <span>{opt}</span>
                               </label>
                             ))}
@@ -1049,7 +1148,7 @@ export const EvaluationFormBuilder: React.FC = () => {
                           <div className="space-y-1.5 pt-1">
                             {q.options.map((opt, oIdx) => (
                               <label key={oIdx} className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" className="text-emerald-800 rounded" />
+                                <input type="checkbox" className="text-blue-800 rounded" />
                                 <span>{opt}</span>
                               </label>
                             ))}
@@ -1062,13 +1161,13 @@ export const EvaluationFormBuilder: React.FC = () => {
 
                         {q.type === 'likert_scale' && <div className="flex flex-wrap gap-3">{(q.scaleLabels || []).map((label, scaleIndex) => <label key={label} className="flex items-center gap-1.5"><input type="radio" name={q.id} disabled />{label}</label>)}</div>}
 
-                        {q.type === 'instructions' && <p className="rounded bg-emerald-50 p-3 text-xs text-slate-700">{q.description || q.label}</p>}
+                        {q.type === 'instructions' && <p className="rounded bg-blue-50 p-3 text-xs text-slate-700">{q.description || q.label}</p>}
 
                         {q.type === 'dropdown' && q.options && <select aria-label={q.label} className="w-full border border-slate-300 rounded p-2 text-xs"><option>Select an answer</option>{q.options.map((option, optionIndex) => <option key={optionIndex}>{option}</option>)}</select>}
 
                         {q.type === 'rubric_table' && <div className="overflow-x-auto"><table className="min-w-full border-collapse text-[11px]"><thead><tr><th className="border p-2 text-left">Criterion</th>{q.options?.map(option => <th key={option} className="border p-2">{option}</th>)}</tr></thead><tbody>{q.criteria?.map(criterion => <tr key={criterion}><th className="border p-2 text-left">{criterion}</th>{q.options?.map(option => <td key={option} className="border p-2 text-center"><input type="radio" name={`${q.id}-${criterion}`} disabled aria-label={`${criterion}: ${option}`} /></td>)}</tr>)}</tbody></table></div>}
 
-                        {q.type === 'instructions' && <p className="rounded bg-emerald-50 p-3 text-xs text-slate-700">{q.description || q.label}</p>}
+                        {q.type === 'instructions' && <p className="rounded bg-blue-50 p-3 text-xs text-slate-700">{q.description || q.label}</p>}
 
                         {q.type === 'short_text' && (
                           <input type="text" placeholder="Type answer here..." className="w-full border border-slate-300 rounded p-2 text-xs" />

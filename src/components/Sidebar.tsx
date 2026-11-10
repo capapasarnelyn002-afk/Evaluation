@@ -55,9 +55,8 @@ export const Sidebar: React.FC = () => {
   }
 
   const getNavItems = (): NavItem[] => {
-    switch (role) {
-      case 'admin':
-        return [
+    if (role !== 'admin') return [];
+    return [
           { id: 'overview', label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
           { id: 'activities', label: 'Evaluation Activities', icon: <Calendar className="w-4 h-4" />, badge: activities.length },
           { id: 'form_builder', label: 'Evaluation Form Builder', icon: <FileEdit className="w-4 h-4" />, badge: forms.length },
@@ -70,28 +69,14 @@ export const Sidebar: React.FC = () => {
           { id: 'settings', label: 'System Settings', icon: <Settings className="w-4 h-4" /> },
           { id: 'account', label: 'My Account', icon: <UserCheck className="w-4 h-4" /> }
         ];
-      case 'participant':
-      default:
-        return [
-          { id: 'portal', label: 'Participant Home', icon: <Home className="w-4 h-4" /> },
-          { id: 'evaluate', label: 'Submit Evaluation', icon: <CheckCircle2 className="w-4 h-4" /> },
-          { id: 'surveys_participant', label: 'Community Surveys', icon: <ClipboardList className="w-4 h-4" />, badge: surveys.filter(s => s.status === 'published').length },
-          { id: 'history', label: 'My Certificates', icon: <Award className="w-4 h-4" /> },
-          { id: 'calendar', label: 'Extension Schedule', icon: <Calendar className="w-4 h-4" /> }
-        ];
-    }
   };
 
   const navItems = getNavItems();
 
   const getRoleBadgeStyle = (userRole: UserRole) => {
-    switch (userRole) {
-      case 'admin':
-        return 'bg-purple-100 text-purple-900 border-purple-300';
-      case 'participant':
-      default:
-        return 'bg-amber-100 text-amber-900 border-amber-300';
-    }
+    return userRole === 'admin'
+      ? 'bg-[#EAF3FC] text-[#003366] border-[#D9E4F0]'
+      : 'bg-slate-100 text-slate-700 border-slate-300';
   };
 
   const renderLogoIcon = (iconName?: string) => {

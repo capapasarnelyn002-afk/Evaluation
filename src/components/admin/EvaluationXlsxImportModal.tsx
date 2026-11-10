@@ -329,7 +329,7 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
         <div className="overflow-y-auto p-5 space-y-5">
           {role !== 'admin' && <p className="rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">Only administrators can import evaluation workbooks.</p>}
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded bg-emerald-900 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded bg-blue-900 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-800">
               <Upload className="w-4 h-4" />
               <span>{fileName ? 'Choose another workbook' : 'Choose .xlsx workbook'}</span>
               <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="sr-only" onChange={event => void handleUpload(event.target.files?.[0])} />
@@ -414,8 +414,8 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
               </label>
 
               {showRespondentPreview && <section className="mx-auto w-full max-w-3xl border border-slate-300 bg-white p-4 sm:p-8 text-slate-900">
-                <header className="border-b-2 border-emerald-800 pb-4 text-center">
-                  <p className="text-[11px] font-bold uppercase text-emerald-900">Evaluation Form Preview</p>
+                <header className="border-b-2 border-blue-800 pb-4 text-center">
+                  <p className="text-[11px] font-bold uppercase text-blue-900">Evaluation Form Preview</p>
                   <h3 className="mt-2 text-lg font-bold">{formTitle || 'Untitled evaluation'}</h3>
                   {description && <p className="mt-1 text-xs text-slate-600">{description}</p>}
                   {instructions && <p className="mt-3 text-xs text-slate-700">{instructions}</p>}
@@ -429,7 +429,7 @@ export const EvaluationXlsxImportModal: React.FC<EvaluationXlsxImportModalProps>
                     {['single_choice', 'multiple_choice', 'yes_no'].includes(question.type) && <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">{(question.type === 'yes_no' ? ['Yes', 'No'] : question.options || []).map((option, optionIndex) => <label key={optionIndex} className="flex items-center gap-2 text-xs"><input type={question.type === 'multiple_choice' ? 'checkbox' : 'radio'} disabled />{option}</label>)}</div>}
                     {(question.type === 'rating_scale' || question.type === 'star_rating' || question.type === 'likert_scale') && <div className="mt-3 flex items-center justify-between gap-2 text-[11px]"><span>{question.scaleMinLabel || 'Low'}</span><div className="flex flex-wrap gap-2">{Array.from({ length: Math.min(10, Math.max(2, (question.scaleMax || 5) - (question.scaleMin || 1) + 1)) }, (_, index) => (question.scaleMin || 1) + index).map(value => <label key={value} className="flex items-center gap-1 rounded-full border border-slate-300 px-2.5 py-1"><input type="radio" disabled />{question.type === 'likert_scale' ? question.scaleLabels?.[value - (question.scaleMin || 1)] || value : value}</label>)}</div><span>{question.scaleMaxLabel || 'High'}</span></div>}
                     {question.type === 'rubric_table' && <div className="mt-3 overflow-x-auto"><table className="min-w-full border-collapse text-[11px]"><thead><tr><th className="border p-2 text-left">Criterion</th>{question.options?.map(option => <th key={option} className="border p-2">{option}</th>)}</tr></thead><tbody>{question.criteria?.map(criterion => <tr key={criterion}><th className="border p-2 text-left">{criterion}</th>{question.options?.map(option => <td key={option} className="border p-2 text-center"><input type="radio" disabled aria-label={`${criterion}: ${option}`} /></td>)}</tr>)}</tbody></table></div>}
-                    {question.type === 'instructions' && <p className="mt-2 rounded bg-emerald-50 p-3 text-xs text-slate-700">{question.description || question.label}</p>}
+                    {question.type === 'instructions' && <p className="mt-2 rounded bg-blue-50 p-3 text-xs text-slate-700">{question.description || question.label}</p>}
                     {question.type === 'long_text' && <div className="mt-2 h-16 rounded border border-slate-300" />}
                     {['short_text', 'number', 'date', 'email'].includes(question.type) && <div className="mt-2 h-9 rounded border border-slate-300" />}
                   </div>)}

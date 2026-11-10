@@ -66,19 +66,19 @@ export const OfflineSyncModal: React.FC = () => {
       <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200">
         
         {/* Header */}
-        <div className="bg-emerald-950 px-6 py-4 text-white flex items-center justify-between border-b border-emerald-900">
+        <div className="bg-blue-950 px-6 py-4 text-white flex items-center justify-between border-b border-blue-900">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-emerald-900 rounded-lg text-amber-400">
+            <div className="p-2 bg-blue-900 rounded-lg text-amber-400">
               <Database className="w-5 h-5" />
             </div>
             <div>
               <h3 id="sync-modal-title" className="font-bold text-sm text-white">Offline Data Collection & Synchronization</h3>
-              <p className="text-xs text-emerald-300">Local Device Queue & Cloud Database Synchronization</p>
+              <p className="text-xs text-blue-300">Local Device Queue & Cloud Database Synchronization</p>
             </div>
           </div>
           <button
             onClick={() => setShowSyncModal(false)}
-            className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-emerald-900 transition-colors cursor-pointer"
+            className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-blue-900 transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
@@ -96,8 +96,8 @@ export const OfflineSyncModal: React.FC = () => {
                   <WifiOff className="w-5 h-5 text-amber-700" />
                 </div>
               ) : (
-                <div className="p-2 rounded-lg bg-emerald-100 text-emerald-900">
-                  <Wifi className="w-5 h-5 text-emerald-700" />
+                <div className="p-2 rounded-lg bg-blue-100 text-blue-900">
+                  <Wifi className="w-5 h-5 text-blue-700" />
                 </div>
               )}
               <div>
@@ -124,7 +124,7 @@ export const OfflineSyncModal: React.FC = () => {
           <div className="border border-slate-200 rounded-xl overflow-hidden">
             <div className="bg-slate-100 px-4 py-3 flex items-center justify-between font-bold text-slate-800">
               <span className="flex items-center gap-1.5">
-                <HardDrive className="w-4 h-4 text-emerald-800" />
+                <HardDrive className="w-4 h-4 text-blue-800" />
                 <span>Pending Offline Records: <span className="tabular-nums font-mono">{offlineQueue.length}</span></span>
               </span>
               <span className="text-[11px] text-slate-500 font-normal">
@@ -134,7 +134,7 @@ export const OfflineSyncModal: React.FC = () => {
 
             {offlineQueue.length === 0 ? (
               <div className="p-8 text-center text-slate-400">
-                <CheckCircle2 className="w-7 h-7 mx-auto mb-1 text-emerald-600" />
+                <CheckCircle2 className="w-7 h-7 mx-auto mb-1 text-blue-600" />
                 <p className="font-semibold text-slate-700">All evaluations are synchronized.</p>
                 <p className="text-[11px] text-slate-400 mt-0.5">No records pending transmission.</p>
               </div>
@@ -159,8 +159,8 @@ export const OfflineSyncModal: React.FC = () => {
           </div>
 
           {syncResult && (
-            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+            <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-300 text-blue-900 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-blue-700 shrink-0" />
               <span>{syncResult}</span>
             </div>
           )}
@@ -179,7 +179,7 @@ export const OfflineSyncModal: React.FC = () => {
             <button
               onClick={handleSync}
               disabled={isSyncing || offlineQueue.length === 0}
-              className="px-4 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold flex items-center gap-2 shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold flex items-center gap-2 shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
               <span>{isSyncing ? 'Synchronizing...' : 'Synchronize Now'}</span>

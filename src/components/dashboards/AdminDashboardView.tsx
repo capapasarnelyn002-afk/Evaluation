@@ -321,7 +321,7 @@ export const AdminDashboardView: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
               <div>
                 <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-emerald-800" />
+                  <Sparkles className="w-5 h-5 text-blue-800" />
                   <span>AI-Assisted Executive Report Generator</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
@@ -332,7 +332,7 @@ export const AdminDashboardView: React.FC = () => {
               <button
                 onClick={handleGenerateReport}
                 disabled={isGeneratingReport}
-                className="px-5 py-2.5 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
+                className="px-5 py-2.5 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
               >
                 {isGeneratingReport ? <RefreshCw className="w-4 h-4 animate-spin text-amber-300" /> : <Sparkles className="w-4 h-4 text-amber-300" />}
                 <span>{isGeneratingReport ? 'Synthesizing with Gemini...' : 'Generate Executive Report'}</span>
@@ -376,7 +376,7 @@ export const AdminDashboardView: React.FC = () => {
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-6 print:border-none print:shadow-none">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
                 <div>
-                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-900">
+                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-900">
                     Official Synthesis Report
                   </span>
                   <h2 className="text-xl font-bold text-slate-900 mt-2">{aiReport.reportTitle}</h2>
@@ -409,7 +409,7 @@ export const AdminDashboardView: React.FC = () => {
                       <span className="text-xs text-slate-500 block truncate">{kpi.metric}</span>
                       <span className="text-xl font-bold text-slate-900 tabular-nums block my-1">{kpi.value}</span>
                       <div className="flex items-center justify-between text-[10px]">
-                        <span className="font-semibold text-emerald-800">{kpi.status}</span>
+                        <span className="font-semibold text-blue-800">{kpi.status}</span>
                         <span className="text-slate-400">{kpi.benchmark}</span>
                       </div>
                     </div>
@@ -419,16 +419,16 @@ export const AdminDashboardView: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-3">
-                  <h3 className="font-bold text-xs text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                  <h3 className="font-bold text-xs text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-blue-700" />
                     <span>Recurring Institutional Strengths</span>
                   </h3>
                   <div className="space-y-2.5">
                     {aiReport.recurringStrengths.map((str, idx) => (
-                      <div key={idx} className="p-3 rounded-lg bg-emerald-50/60 border border-emerald-200 text-xs">
+                      <div key={idx} className="p-3 rounded-lg bg-blue-50/60 border border-blue-200 text-xs">
                         <div className="flex justify-between items-baseline mb-1">
-                          <span className="font-bold text-emerald-950">{str.topic}</span>
-                          <span className="text-[10px] font-bold text-emerald-800">{str.sentimentRatio}</span>
+                          <span className="font-bold text-blue-950">{str.topic}</span>
+                          <span className="text-[10px] font-bold text-blue-800">{str.sentimentRatio}</span>
                         </div>
                         <p className="text-slate-600 text-[11px] leading-normal">{str.summary}</p>
                       </div>
@@ -475,7 +475,7 @@ export const AdminDashboardView: React.FC = () => {
                       </div>
                       <div className="text-right shrink-0 text-[11px]">
                         <span className="text-slate-500 block">Unit: {rec.responsibleUnit}</span>
-                        <span className="font-bold text-emerald-800">{rec.priority} Priority</span>
+                        <span className="font-bold text-blue-800">{rec.priority} Priority</span>
                       </div>
                     </div>
                   ))}
@@ -512,17 +512,17 @@ export const AdminDashboardView: React.FC = () => {
                   <div key={dim.key} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700">{dim.label}</span>
-                      <span className="font-bold text-emerald-800 tabular-nums text-sm">{dim.score} / 5.0</span>
+                      <span className="font-bold text-blue-800 tabular-nums text-sm">{dim.score} / 5.0</span>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                       <div 
-                        className="bg-emerald-800 h-full rounded-full" 
+                        className="bg-blue-800 h-full rounded-full"
                         style={{ width: `${(dim.score / 5) * 100}%` }} 
                       />
                     </div>
                     <div className="flex items-center justify-between text-[10px] text-slate-400">
                       <span>Benchmark: {dim.benchmark}</span>
-                      <span className="text-emerald-700 font-bold">+{diff} above target</span>
+                      <span className="text-blue-700 font-bold">+{diff} above target</span>
                     </div>
                   </div>
                 );
@@ -533,7 +533,7 @@ export const AdminDashboardView: React.FC = () => {
           {/* Ask AI Natural Language Query Box */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-3">
             <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-800" />
+              <Sparkles className="w-4 h-4 text-blue-800" />
               <span>Ask Natural Language Analytics Query</span>
             </h3>
             <p className="text-xs text-slate-500">
@@ -546,12 +546,12 @@ export const AdminDashboardView: React.FC = () => {
                 placeholder="Ask about evaluation trends, beneficiary feedback, or training turnouts..."
                 value={quickQuestion}
                 onChange={(e) => setQuickQuestion(e.target.value)}
-                className="flex-1 border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-emerald-800"
+                className="flex-1 border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-blue-800"
               />
               <button
                 type="submit"
                 disabled={isAskingAi}
-                className="px-5 py-2.5 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
+                className="px-5 py-2.5 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
               >
                 {isAskingAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 <span>{isAskingAi ? 'Querying...' : 'Ask AI'}</span>
@@ -559,8 +559,8 @@ export const AdminDashboardView: React.FC = () => {
             </form>
 
             {quickAnswer && (
-              <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 text-xs text-slate-800 leading-relaxed space-y-1">
-                <span className="font-bold text-emerald-900 block text-[11px] uppercase tracking-wider">AI Executive Response:</span>
+              <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200 text-xs text-slate-800 leading-relaxed space-y-1">
+                <span className="font-bold text-blue-900 block text-[11px] uppercase tracking-wider">AI Executive Response:</span>
                 <p>{quickAnswer}</p>
               </div>
             )}
@@ -580,7 +580,7 @@ export const AdminDashboardView: React.FC = () => {
             </div>
             <button
               onClick={() => setShowAddUserModal(true)}
-              className="px-3.5 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-3.5 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Plus className="w-4 h-4" />
               <span>Add User Account</span>
@@ -624,7 +624,7 @@ export const AdminDashboardView: React.FC = () => {
                       <button
                         onClick={() => updateUserRole(u.id, u.role, u.status === 'active' ? 'inactive' : 'active')}
                         className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded cursor-pointer ${
-                          u.status === 'active' ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          u.status === 'active' ? 'bg-blue-50 text-blue-800 hover:bg-blue-100' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                         }`}
                         title="Click to toggle account status"
                       >
@@ -635,7 +635,7 @@ export const AdminDashboardView: React.FC = () => {
                       <select
                         value={u.role}
                         onChange={(e) => updateUserRole(u.id, e.target.value as UserRole, u.status)}
-                        className="bg-white border border-slate-300 rounded px-2 py-1 text-xs text-slate-800 font-medium focus:outline-hidden focus:ring-1 focus:ring-emerald-700"
+                        className="bg-white border border-slate-300 rounded px-2 py-1 text-xs text-slate-800 font-medium focus:outline-hidden focus:ring-1 focus:ring-blue-700"
                       >
                         <option value="admin">Administrator</option>
                         <option value="participant">Participant</option>
@@ -696,7 +696,7 @@ export const AdminDashboardView: React.FC = () => {
 
                 <button
                   onClick={() => exportDataAsCSV(true)}
-                  className="px-3.5 py-1.5 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="px-3.5 py-1.5 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Export CSV</span>
@@ -794,7 +794,7 @@ export const AdminDashboardView: React.FC = () => {
 
                   return (
                     <tr key={sub.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-3.5 font-mono text-emerald-900 font-bold">
+                      <td className="px-5 py-3.5 font-mono text-blue-900 font-bold">
                         {sub.controlNumber}
                       </td>
 
@@ -825,7 +825,7 @@ export const AdminDashboardView: React.FC = () => {
                       <td className="px-4 py-3.5">
                         <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
                           sub.sentiment.overall === 'positive'
-                            ? 'bg-emerald-50 text-emerald-800'
+                            ? 'bg-blue-50 text-blue-800'
                             : sub.sentiment.overall === 'negative'
                             ? 'bg-rose-50 text-rose-800'
                             : 'bg-slate-100 text-slate-600'
@@ -842,7 +842,7 @@ export const AdminDashboardView: React.FC = () => {
                       <td className="px-4 py-3.5">
                         <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
                           sub.adminFollowUpStatus === 'resolved'
-                            ? 'bg-emerald-100 text-emerald-900'
+                            ? 'bg-blue-100 text-blue-900'
                             : sub.adminFollowUpStatus === 'pending'
                             ? 'bg-amber-100 text-amber-900'
                             : 'bg-slate-100 text-slate-600'
@@ -917,7 +917,7 @@ export const AdminDashboardView: React.FC = () => {
                     </td>
                     <td className="px-4 py-3.5 font-semibold text-slate-900">{log.adminName}</td>
                     <td className="px-4 py-3.5 font-mono text-[11px] text-slate-700">{log.action}</td>
-                    <td className="px-4 py-3.5 font-mono text-emerald-900 font-semibold">{log.participantControlNumber || '—'}</td>
+                    <td className="px-4 py-3.5 font-mono text-blue-900 font-semibold">{log.participantControlNumber || '—'}</td>
                     <td className="px-5 py-3.5 text-slate-600 max-w-sm">{log.reason}</td>
                   </tr>
                 ))}
@@ -1010,7 +1010,7 @@ export const AdminDashboardView: React.FC = () => {
             <div className="pt-4 border-t border-slate-100 flex justify-end">
               <button
                 type="submit"
-                className="px-4 py-2 rounded-lg bg-emerald-900 text-white font-bold hover:bg-emerald-950 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="px-4 py-2 rounded-lg bg-blue-900 text-white font-bold hover:bg-blue-950 flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
                 <Save className="w-4 h-4" />
                 <span>Save Configuration</span>
@@ -1022,7 +1022,7 @@ export const AdminDashboardView: React.FC = () => {
           <div className="mt-6 pt-5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
             <div>
               <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
-                <Palette className="w-4 h-4 text-emerald-800" />
+                <Palette className="w-4 h-4 text-blue-800" />
                 <span>Appearance, Typography & Font Colors</span>
               </h4>
               <p className="text-[11px] text-slate-500 mt-0.5">
@@ -1157,7 +1157,7 @@ export const AdminDashboardView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-emerald-900 text-white font-bold hover:bg-emerald-950"
+                  className="px-4 py-2 rounded-lg bg-blue-900 text-white font-bold hover:bg-blue-950"
                 >
                   Save Account
                 </button>
@@ -1204,7 +1204,7 @@ export const AdminDashboardView: React.FC = () => {
               </button>
               <button
                 onClick={handleSaveStatus}
-                className="px-4 py-1.5 rounded-lg bg-emerald-900 text-white text-xs font-bold"
+                className="px-4 py-1.5 rounded-lg bg-blue-900 text-white text-xs font-bold"
               >
                 Save
               </button>

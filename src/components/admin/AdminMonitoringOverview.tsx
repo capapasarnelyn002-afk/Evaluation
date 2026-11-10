@@ -115,13 +115,13 @@ export const AdminMonitoringOverview: React.FC = () => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
             <span className="font-semibold uppercase tracking-wider">Overall Satisfaction</span>
-            <span className="font-bold text-emerald-800">Target: ≥{systemSettings.targetSatisfactionMean}</span>
+            <span className="font-bold text-blue-800">Target: ≥{systemSettings.targetSatisfactionMean}</span>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-slate-900 tabular-nums">{overallMean}</span>
             <span className="text-xs text-slate-400">/ 5.00</span>
           </div>
-          <div className="mt-2 text-xs text-emerald-800 font-medium flex items-center gap-1">
+          <div className="mt-2 text-xs text-blue-800 font-medium flex items-center gap-1">
             <TrendingUp className="w-3.5 h-3.5" />
             <span>AACCUP Level III Compliant</span>
           </div>
@@ -187,7 +187,7 @@ export const AdminMonitoringOverview: React.FC = () => {
             </div>
             <button
               onClick={() => setCurrentView('activities')}
-              className="text-xs font-bold text-emerald-900 hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-blue-900 hover:underline flex items-center gap-1 cursor-pointer"
             >
               <span>Manage Activities</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -237,7 +237,7 @@ export const AdminMonitoringOverview: React.FC = () => {
             <div className="space-y-3.5 text-xs mt-4">
               <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                  <ShieldCheck className="w-4 h-4 text-blue-700" />
                   <div>
                     <span className="font-bold text-slate-900 block">RA 10173 Audit Logging</span>
                     <span className="text-[11px] text-slate-500">Immutable Trail Active</span>
@@ -272,7 +272,7 @@ export const AdminMonitoringOverview: React.FC = () => {
 
           <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
             <span className="text-slate-500">Net Satisfaction Score:</span>
-            <span className="font-bold text-emerald-900 tabular-nums">+{netSatisfactionScore}% NSS</span>
+            <span className="font-bold text-blue-900 tabular-nums">+{netSatisfactionScore}% NSS</span>
           </div>
         </div>
 
@@ -287,7 +287,7 @@ export const AdminMonitoringOverview: React.FC = () => {
           </div>
           <button
             onClick={() => setCurrentView('audit')}
-            className="text-xs font-bold text-emerald-900 hover:underline flex items-center gap-1 cursor-pointer"
+            className="text-xs font-bold text-blue-900 hover:underline flex items-center gap-1 cursor-pointer"
           >
             <span>View All Activity Logs</span>
             <ArrowRight className="w-3.5 h-3.5" />

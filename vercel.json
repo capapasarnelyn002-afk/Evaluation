@@ -5,6 +5,14 @@
     {
       "source": "/api/:path*",
       "destination": "/api/[...path]"
+    },
+    {
+      "source": "/evaluate",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/evaluate/:path*",
+      "destination": "/index.html"
     }
   ]
 }

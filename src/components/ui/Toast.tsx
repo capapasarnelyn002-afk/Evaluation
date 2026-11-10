@@ -36,14 +36,14 @@ const ToastItem: React.FC<{ toast: ToastMessage; onDismiss: (id: string) => void
 
   const bgStyle =
     toast.type === 'success'
-      ? 'bg-slate-900/95 text-white border-emerald-500/40 shadow-lg'
+      ? 'bg-slate-900/95 text-white border-blue-500/40 shadow-lg'
       : toast.type === 'error'
       ? 'bg-rose-950/95 text-white border-rose-500/40 shadow-lg'
       : 'bg-slate-900/95 text-white border-slate-700 shadow-lg';
 
   const icon =
     toast.type === 'success' ? (
-      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+      <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
     ) : toast.type === 'error' ? (
       <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
     ) : (

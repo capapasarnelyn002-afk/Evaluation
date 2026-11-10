@@ -49,19 +49,19 @@ export const EvaluationReceiptModal: React.FC<Props> = ({ evaluation, activity, 
       <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header bar */}
-        <div className="bg-emerald-950 px-6 py-4 text-white flex items-center justify-between border-b border-emerald-900">
+        <div className="bg-blue-950 px-6 py-4 text-white flex items-center justify-between border-b border-blue-900">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-emerald-900 rounded-lg text-amber-400">
+            <div className="p-2 bg-blue-900 rounded-lg text-amber-400">
               <FileCheck2 className="w-5 h-5" />
             </div>
             <div>
               <h3 id="receipt-modal-title" className="font-bold text-sm text-white">Evaluation & Attendance Receipt</h3>
-              <p className="text-xs text-emerald-300">Official SLSU Verification Record</p>
+              <p className="text-xs text-blue-300">Official SLSU Verification Record</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-emerald-900 transition-colors cursor-pointer"
+            className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-blue-900 transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
@@ -74,12 +74,12 @@ export const EvaluationReceiptModal: React.FC<Props> = ({ evaluation, activity, 
             
             {/* Watermark badge */}
             <div className="absolute -right-6 -bottom-6 opacity-5 pointer-events-none" aria-hidden="true">
-              <Building2 className="w-48 h-48 text-emerald-950" />
+              <Building2 className="w-48 h-48 text-blue-950" />
             </div>
 
             {/* University Letterhead */}
             <div className="text-center pb-4 border-b border-slate-200">
-              <h4 className="text-xs uppercase font-extrabold tracking-widest text-emerald-950">
+              <h4 className="text-xs uppercase font-extrabold tracking-widest text-blue-950">
                 Southern Leyte State University
               </h4>
               <p className="text-[11px] text-slate-600 font-medium">HINUNANGAN CAMPUS • Hinunangan, Southern Leyte</p>
@@ -90,7 +90,7 @@ export const EvaluationReceiptModal: React.FC<Props> = ({ evaluation, activity, 
 
             {/* Certificate Title */}
             <div className="text-center my-4">
-              <p className="text-xs font-bold tracking-widest uppercase text-emerald-900 mb-1">
+              <p className="text-xs font-bold tracking-widest uppercase text-blue-900 mb-1">
                 Certificate of Completed Evaluation
               </p>
               <p className="text-xs text-slate-500">This certifies the validated attendance and feedback submission of:</p>
@@ -137,7 +137,7 @@ export const EvaluationReceiptModal: React.FC<Props> = ({ evaluation, activity, 
                     className="p-1 rounded text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
                     title="Copy Control Number"
                   >
-                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copied ? <Check className="w-3.5 h-3.5 text-blue-600" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </div>
                 <p className="text-[10px] text-slate-400 mt-0.5">
@@ -150,7 +150,7 @@ export const EvaluationReceiptModal: React.FC<Props> = ({ evaluation, activity, 
                 <div className="w-14 h-14 bg-slate-900 rounded p-1 flex items-center justify-center text-white shadow-xs">
                   <QrCode className="w-12 h-12 text-white" />
                 </div>
-                <span className="text-[9px] text-emerald-900 font-bold mt-1">VERIFIED VALID</span>
+                <span className="text-[9px] text-blue-900 font-bold mt-1">VERIFIED VALID</span>
               </div>
             </div>
 
@@ -172,14 +172,14 @@ export const EvaluationReceiptModal: React.FC<Props> = ({ evaluation, activity, 
         {/* Modal Action Buttons */}
         <div className="px-6 py-4 bg-white flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-slate-500 flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+            <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0" />
             <span>SLSU Central Extension Services Registry</span>
           </p>
 
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-4 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               <span>Print / Save PDF</span>

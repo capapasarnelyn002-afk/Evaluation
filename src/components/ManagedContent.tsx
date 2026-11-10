@@ -39,7 +39,7 @@ export const ManagedContentList: React.FC<{
         }
         if (block.type === 'button' || block.type === 'link') {
           return href ? (
-            <a key={block.id} href={href} className={block.type === 'button' ? 'inline-flex items-center rounded-md bg-emerald-900 px-3 py-2 text-sm font-semibold text-white no-underline' : 'font-medium text-emerald-800 underline'} style={style} target={href.startsWith('https://') ? '_blank' : undefined} rel={href.startsWith('https://') ? 'noreferrer' : undefined}>
+            <a key={block.id} href={href} className={block.type === 'button' ? 'inline-flex items-center rounded-md bg-blue-900 px-3 py-2 text-sm font-semibold text-white no-underline' : 'font-medium text-blue-800 underline'} style={style} target={href.startsWith('https://') ? '_blank' : undefined} rel={href.startsWith('https://') ? 'noreferrer' : undefined}>
               {block.buttonLabel || title || body || 'Open link'}
             </a>
           ) : null;

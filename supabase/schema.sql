@@ -38,6 +38,8 @@ create table if not exists public.evaluation_forms (
   description text not null default '',
   instructions text,
   status text not null check (status in ('draft', 'published', 'archived')),
+  "publicEnabled" boolean not null default true,
+  "expiresAt" date,
   version integer not null default 1,
   "targetActivityType" text,
   "activityId" text,
@@ -49,6 +51,10 @@ create table if not exists public.evaluation_forms (
   "updatedAt" timestamptz not null default now(),
   __position integer not null default 0
 );
+
+alter table public.evaluation_forms
+  add column if not exists "publicEnabled" boolean not null default true,
+  add column if not exists "expiresAt" date;
 
 create table if not exists public.evaluations (
   id text primary key,
@@ -129,6 +135,15 @@ create table if not exists public.website_themes (
   "updatedAt" timestamptz not null default now()
 );
 
+create table if not exists public.public_evaluation_submission_limits (
+  rate_limit_key text primary key,
+  window_started_at timestamptz not null,
+  request_count integer not null check (request_count > 0)
+);
+
+create index if not exists public_evaluation_submission_limits_window_idx
+  on public.public_evaluation_submission_limits (window_started_at);
+
 create index if not exists evaluations_activity_id_idx on public.evaluations ("activityId");
 create index if not exists evaluations_participant_email_idx on public.evaluations (lower("participantEmail"));
 create index if not exists survey_responses_survey_id_idx on public.survey_responses ("surveyId");
@@ -146,8 +161,52 @@ alter table public.website_themes enable row level security;
 
 grant all on public.users, public.activities, public.evaluation_forms, public.evaluations,
   public.audit_logs, public.surveys, public.survey_responses, public.system_settings,
-  public.website_themes to service_role;
+  public.website_themes, public.public_evaluation_submission_limits to service_role;
 grant usage on schema public to service_role;
+
+alter table public.public_evaluation_submission_limits enable row level security;
+
+create or replace function public.reserve_public_evaluation_submission(
+  p_key text,
+  p_limit integer,
+  p_window_seconds integer
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_count integer;
+begin
+  if p_key is null or length(p_key) <> 64 or p_limit < 1 or p_window_seconds < 1 then
+    raise exception 'Invalid public submission rate-limit parameters.';
+  end if;
+
+  delete from public.public_evaluation_submission_limits
+  where window_started_at < now() - interval '1 day';
+
+  insert into public.public_evaluation_submission_limits (rate_limit_key, window_started_at, request_count)
+  values (p_key, now(), 1)
+  on conflict (rate_limit_key) do update
+  set window_started_at = case
+        when public.public_evaluation_submission_limits.window_started_at <= now() - make_interval(secs => p_window_seconds)
+          then now()
+        else public.public_evaluation_submission_limits.window_started_at
+      end,
+      request_count = case
+        when public.public_evaluation_submission_limits.window_started_at <= now() - make_interval(secs => p_window_seconds)
+          then 1
+        else public.public_evaluation_submission_limits.request_count + 1
+      end
+  returning request_count into v_count;
+
+  return v_count <= p_limit;
+end;
+$$;
+
+revoke all on function public.reserve_public_evaluation_submission(text, integer, integer) from public, anon, authenticated;
+grant execute on function public.reserve_public_evaluation_submission(text, integer, integer) to service_role;
 
 -- Isolate theme writes so unrelated snapshot rows cannot block appearance saves.
 create or replace function public.save_website_theme(p_theme jsonb, p_audit_log jsonb)

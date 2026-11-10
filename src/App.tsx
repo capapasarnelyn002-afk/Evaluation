@@ -3,11 +3,11 @@ import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { AdminDashboardView } from './components/dashboards/AdminDashboardView';
-import { ParticipantDashboardView } from './components/dashboards/ParticipantDashboardView';
 import { EvaluationReceiptModal } from './components/EvaluationReceiptModal';
 import { OfflineSyncModal } from './components/OfflineSyncModal';
 import { CapstoneAboutModal } from './components/CapstoneAboutModal';
 import { LoginModal } from './components/LoginModal';
+import { PublicEvaluationView } from './components/PublicEvaluationView';
 import { ToastContainer } from './components/ui/Toast';
 import { Building2, ShieldCheck, Award } from 'lucide-react';
 
@@ -42,7 +42,7 @@ const renderManagedBlock = (block: any, index: number, mode: 'footer' | 'page' =
   if (block.type === 'button') {
     return (
       <div key={block.id || index} className={baseClass}>
-        <button type="button" className="px-3 py-1.5 rounded-md bg-emerald-900 text-white text-[11px] font-semibold">
+        <button type="button" className="px-3 py-1.5 rounded-md bg-blue-900 text-white text-[11px] font-semibold">
           {block.buttonLabel || block.title || 'Action'}
         </button>
       </div>
@@ -73,7 +73,7 @@ const MainLayout: React.FC = () => {
 
   if (isAuthLoading || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F8FC] flex items-center justify-center">
         {isAuthLoading ? (
           <p className="text-sm text-slate-600">Checking sign-in session...</p>
         ) : (
@@ -94,14 +94,13 @@ const MainLayout: React.FC = () => {
     switch (role) {
       case 'admin':
         return <AdminDashboardView />;
-      case 'participant':
       default:
-        return <ParticipantDashboardView />;
+        return null;
     }
   };
 
   return (
-    <div className="min-h-[100dvh] bg-slate-100/70 text-slate-900 font-sans flex flex-col overflow-x-clip">
+    <div className="min-h-[100dvh] bg-[#F5F8FC] text-slate-900 font-sans flex flex-col overflow-x-clip">
       {/* Fixed Desktop Sidebar & Mobile Drawer */}
       <Sidebar />
 
@@ -133,9 +132,9 @@ const MainLayout: React.FC = () => {
           <footer
             className="border-t py-8 px-6 text-xs mt-auto"
             style={{
-              backgroundColor: theme.footerBackgroundColor || '#0f172a',
-              color: theme.footerTextColor || '#cbd5e1',
-              borderColor: theme.footerBorderColor || '#1e293b',
+              backgroundColor: theme.footerBackgroundColor || '#003366',
+              color: theme.footerTextColor || '#EAF3FC',
+              borderColor: theme.footerBorderColor || '#0056A6',
               fontFamily: theme.footerFontFamily || 'Inter, system-ui, sans-serif',
               fontSize: theme.footerFontSize || '0.75rem',
               fontWeight: theme.footerFontWeight || 500,
@@ -155,8 +154,8 @@ const MainLayout: React.FC = () => {
                       style={{
                         width: theme.footerLogoSize || '32px',
                         height: theme.footerLogoSize || '32px',
-                        backgroundColor: theme.primaryColor || '#022c22',
-                        borderColor: theme.secondaryColor || '#065f46'
+                        backgroundColor: theme.primaryColor || '#0056A6',
+                        borderColor: theme.secondaryColor || '#1976D2'
                       }}
                     >
                       <Building2 className="w-4 h-4" />
@@ -164,7 +163,7 @@ const MainLayout: React.FC = () => {
                   )}
                   <div>
                     <p className="font-semibold text-white text-xs">{theme.footerTitle || 'Institutional footer'}</p>
-                    <p style={{ color: theme.footerTextColor || '#cbd5e1' }} className="text-[11px] opacity-90">
+                    <p style={{ color: theme.footerTextColor || '#EAF3FC' }} className="text-[11px] opacity-90">
                       {theme.footerSubtitle || 'Updated via administrator content settings.'}
                     </p>
                   </div>
@@ -172,7 +171,7 @@ const MainLayout: React.FC = () => {
 
                 <div className="text-center md:text-right space-y-1">
                   <p className="font-medium text-slate-200">Evaluation system footer</p>
-                  <p style={{ color: theme.footerTextColor || '#cbd5e1' }} className="text-[11px] opacity-90">
+                  <p style={{ color: theme.footerTextColor || '#EAF3FC' }} className="text-[11px] opacity-90">
                     Content is managed from the admin appearance settings.
                   </p>
                 </div>
@@ -204,9 +203,12 @@ const MainLayout: React.FC = () => {
 };
 
 export default function App() {
+  const publicEvaluationMatch = window.location.pathname.match(/^\/evaluate(?:\/([^/]+))?\/?$/);
   return (
     <AppProvider>
-      <MainLayout />
+      {publicEvaluationMatch
+        ? <PublicEvaluationView formId={publicEvaluationMatch[1] ? decodeURIComponent(publicEvaluationMatch[1]) : undefined} />
+        : <MainLayout />}
     </AppProvider>
   );
 }

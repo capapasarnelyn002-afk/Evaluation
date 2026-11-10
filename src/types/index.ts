@@ -57,7 +57,7 @@ export interface EvaluationSubmission {
   participantPhone?: string;
   participantCategory: ParticipantCategory;
   controlNumber: string;
-  verificationMethod: 'student_id' | 'qr_code' | 'sms_code' | 'signed_attendance' | 'offline_form';
+  verificationMethod: 'student_id' | 'qr_code' | 'sms_code' | 'signed_attendance' | 'offline_form' | 'public_link';
   coreRatings: {
     satisfaction: number;
     objectives: number;
@@ -145,6 +145,8 @@ export interface EvaluationForm {
   description: string;
   instructions?: string;
   status: 'draft' | 'published' | 'archived';
+  publicEnabled?: boolean;
+  expiresAt?: string | null;
   version: number;
   targetActivityType?: ActivityType | 'all';
   activityId?: string;

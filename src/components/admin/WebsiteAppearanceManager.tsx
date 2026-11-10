@@ -54,33 +54,33 @@ interface PresetTheme {
 const PRESET_THEMES: PresetTheme[] = [
   {
     id: 'slsu-official',
-    name: 'SLSU Official Emerald & Gold',
-    description: 'Southern Leyte State University institutional forest green with academic gold accents.',
-    previewColors: ['#022c22', '#065f46', '#d97706', '#f8fafc'],
+    name: 'SLSU-Inspired White & Blue',
+    description: 'Clean academic white and blue styling inspired by Southern Leyte State University.',
+    previewColors: ['#0056A6', '#1976D2', '#003366', '#F5F8FC'],
     theme: {
       siteName: 'Southern Leyte State University',
       siteTagline: 'Extension Services Evaluation System & Decision Support',
       logoText: 'SLSU-Hinunangan',
-      primaryColor: '#022c22',
-      secondaryColor: '#065f46',
-      accentColor: '#d97706',
-      pageBgColor: '#f8fafc',
+      primaryColor: '#0056A6',
+      secondaryColor: '#1976D2',
+      accentColor: '#003366',
+      pageBgColor: '#F5F8FC',
       cardBgColor: '#ffffff',
       sidebarBgColor: '#ffffff',
       sidebarTextColor: '#1e293b',
-      sidebarLogoColor: '#d97706',
-      sidebarLogoBg: '#022c22',
+      sidebarLogoColor: '#FFFFFF',
+      sidebarLogoBg: '#0056A6',
       sidebarLogoTextColor: '#1e293b',
       sidebarLogoIcon: 'building',
       sidebarLogoShape: 'rounded',
-      sidebarActiveItemBg: '#022c22',
-      sidebarActiveItemText: '#ffffff',
+      sidebarActiveItemBg: '#EAF3FC',
+      sidebarActiveItemText: '#003366',
       sidebarBorderColor: '#e2e8f0',
-      headerBgColor: '#022c22',
-      headerTextColor: '#ffffff',
-      buttonPrimaryBg: '#064e3b',
+      headerBgColor: '#FFFFFF',
+      headerTextColor: '#003366',
+      buttonPrimaryBg: '#0056A6',
       buttonPrimaryText: '#ffffff',
-      linkTextColor: '#065f46',
+      linkTextColor: '#1976D2',
       themeMode: 'light'
     }
   },
@@ -244,14 +244,14 @@ const FONT_COLOR_SCHEMES = [
     labelColor: '#475569'
   },
   {
-    id: 'forest-emerald',
-    name: 'Institutional Forest & Charcoal',
-    description: 'Deep forest green titles with clear charcoal body text reflecting university identity.',
-    titleColor: '#022c22',
-    headingColor: '#064e3b',
+    id: 'slsu-blue-charcoal',
+    name: 'SLSU-Inspired Blue & Charcoal',
+    description: 'Blue headings and charcoal body text in a clean academic style.',
+    titleColor: '#0056A6',
+    headingColor: '#0056A6',
     bodyColor: '#1e293b',
     mutedColor: '#047857',
-    labelColor: '#065f46'
+    labelColor: '#1976D2'
   },
   {
     id: 'high-contrast-black',
@@ -290,8 +290,8 @@ const FONT_COLOR_SWATCHES = [
   { name: 'Deep Slate', color: '#0f172a' },
   { name: 'Charcoal', color: '#1e293b' },
   { name: 'Muted Slate', color: '#334155' },
-  { name: 'Forest Green', color: '#022c22' },
-  { name: 'Pine Emerald', color: '#064e3b' },
+  { name: 'Primary Blue', color: '#0056A6' },
+  { name: 'Secondary Blue', color: '#1976D2' },
   { name: 'Midnight Navy', color: '#1e1b4b' },
   { name: 'Royal Indigo', color: '#312e81' },
   { name: 'Deep Violet', color: '#3b0764' },
@@ -301,7 +301,7 @@ const FONT_COLOR_SWATCHES = [
 ];
 
 const LOGO_COLOR_SWATCHES = [
-  { name: 'Institutional Gold', color: '#d97706' },
+  { name: 'Academic Gold', color: '#d97706' },
   { name: 'Warm Amber', color: '#f59e0b' },
   { name: 'Emerald Green', color: '#059669' },
   { name: 'Vibrant Mint', color: '#10b981' },
@@ -314,8 +314,8 @@ const LOGO_COLOR_SWATCHES = [
 ];
 
 const LOGO_BG_SWATCHES = [
-  { name: 'Forest Emerald', color: '#022c22' },
-  { name: 'Botanical Green', color: '#065f46' },
+  { name: 'Primary Blue', color: '#0056A6' },
+  { name: 'Secondary Blue', color: '#1976D2' },
   { name: 'Midnight Navy', color: '#1e1b4b' },
   { name: 'Enterprise Slate', color: '#0f172a' },
   { name: 'Executive Violet', color: '#3b0764' },
@@ -461,15 +461,15 @@ export const WebsiteAppearanceManager: React.FC = () => {
       ...prev,
       sidebarLogoType: 'icon',
       sidebarLogoUrl: '',
-      sidebarLogoColor: '#d97706',
-      sidebarLogoBg: '#022c22',
+      sidebarLogoColor: '#FFFFFF',
+      sidebarLogoBg: '#0056A6',
       sidebarLogoTextColor: '#1e293b',
       sidebarLogoIcon: 'building',
       sidebarLogoShape: 'rounded',
       sidebarBgColor: '#ffffff',
       sidebarTextColor: '#1e293b',
-      sidebarActiveItemBg: '#022c22',
-      sidebarActiveItemText: '#ffffff',
+      sidebarActiveItemBg: '#EAF3FC',
+      sidebarActiveItemText: '#003366',
       sidebarBorderColor: '#e2e8f0'
     }));
     setUploadedFilePreview(null);
@@ -477,7 +477,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
     addToast({
       type: 'info',
       title: 'Sidebar Reset to Defaults',
-      description: 'Restored SLSU institutional forest green badge with academic gold logo icon.'
+      description: 'Restored the SLSU-inspired white and blue sidebar style.'
     });
   };
 
@@ -885,15 +885,15 @@ export const WebsiteAppearanceManager: React.FC = () => {
     }
   };
 
-  const currentSidebarLogoColor = formTheme.sidebarLogoColor || formTheme.accentColor || '#d97706';
-  const currentSidebarLogoBg = formTheme.sidebarLogoBg || formTheme.primaryColor || '#022c22';
+  const currentSidebarLogoColor = formTheme.sidebarLogoColor || formTheme.accentColor || '#FFFFFF';
+  const currentSidebarLogoBg = formTheme.sidebarLogoBg || formTheme.primaryColor || '#0056A6';
   const currentSidebarLogoTextColor = formTheme.sidebarLogoTextColor || formTheme.sidebarTextColor || '#1e293b';
   const currentSidebarLogoShape = formTheme.sidebarLogoShape || 'rounded';
   const currentSidebarLogoIcon = formTheme.sidebarLogoIcon || 'building';
   const currentSidebarBg = formTheme.sidebarBgColor || '#ffffff';
   const currentSidebarTextColor = formTheme.sidebarTextColor || '#1e293b';
-  const currentActiveBg = formTheme.sidebarActiveItemBg || formTheme.primaryColor || '#022c22';
-  const currentActiveText = formTheme.sidebarActiveItemText || '#ffffff';
+  const currentActiveBg = formTheme.sidebarActiveItemBg || '#EAF3FC';
+  const currentActiveText = formTheme.sidebarActiveItemText || '#003366';
   const currentBorderColor = formTheme.sidebarBorderColor || '#e2e8f0';
 
   const previewTitleColor = currentTypo.pageTitleColor || formTheme.fontColorTitle || '#0f172a';
@@ -917,7 +917,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-              <PanelLeft className="w-5 h-5 text-emerald-800" />
+              <PanelLeft className="w-5 h-5 text-blue-800" />
               <span>Sidebar Configuration & Logo Manager</span>
             </h2>
             <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-800 border border-purple-200 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
@@ -952,7 +952,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
             type="button"
             onClick={() => handleSaveTheme()}
             disabled={isSaving || role !== 'admin'}
-            className="px-4 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
             <span>{isSaving ? 'Saving System-Wide...' : 'Save Changes'}</span>
@@ -968,7 +968,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => addManagedBlock('footer')} className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold">Add footer block</button>
-            <button type="button" onClick={() => addManagedBlock('page')} className="px-3 py-1.5 rounded-lg bg-emerald-900 text-white text-[11px] font-semibold">Add page block</button>
+            <button type="button" onClick={() => addManagedBlock('page')} className="px-3 py-1.5 rounded-lg bg-blue-900 text-white text-[11px] font-semibold">Add page block</button>
           </div>
         </div>
 
@@ -1060,8 +1060,8 @@ export const WebsiteAppearanceManager: React.FC = () => {
           <div className="space-y-2">
             <label className="block text-xs font-semibold text-slate-700">Header Background</label>
             <div className="flex items-center gap-2">
-              <input type="color" value={formTheme.headerBackgroundColor || formTheme.headerBgColor || '#022c22'} onChange={(e) => updateField('headerBackgroundColor', e.target.value)} className="w-10 h-9 rounded border border-slate-300 p-0.5" />
-              <input type="text" value={formTheme.headerBackgroundColor || formTheme.headerBgColor || '#022c22'} onChange={(e) => updateField('headerBackgroundColor', e.target.value)} className="flex-1 border border-slate-300 rounded-lg p-2 text-xs font-mono uppercase" />
+              <input type="color" value={formTheme.headerBackgroundColor || formTheme.headerBgColor || '#0056A6'} onChange={(e) => updateField('headerBackgroundColor', e.target.value)} className="w-10 h-9 rounded border border-slate-300 p-0.5" />
+              <input type="text" value={formTheme.headerBackgroundColor || formTheme.headerBgColor || '#0056A6'} onChange={(e) => updateField('headerBackgroundColor', e.target.value)} className="flex-1 border border-slate-300 rounded-lg p-2 text-xs font-mono uppercase" />
             </div>
           </div>
           <div className="space-y-2">
@@ -1095,11 +1095,11 @@ export const WebsiteAppearanceManager: React.FC = () => {
           onClick={() => setActiveTab('sidebar')}
           className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'sidebar'
-              ? 'bg-emerald-950 text-white shadow-xs'
+              ? 'bg-blue-950 text-white shadow-xs'
               : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          <PanelLeft className="w-4 h-4 text-emerald-400" />
+          <PanelLeft className="w-4 h-4 text-blue-400" />
           <span>Sidebar & Logo Configuration</span>
         </button>
 
@@ -1108,7 +1108,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
           onClick={() => setActiveTab('typography')}
           className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'typography'
-              ? 'bg-emerald-950 text-white shadow-xs'
+              ? 'bg-blue-950 text-white shadow-xs'
               : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
           }`}
         >
@@ -1121,11 +1121,11 @@ export const WebsiteAppearanceManager: React.FC = () => {
           onClick={() => setActiveTab('colors')}
           className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'colors'
-              ? 'bg-emerald-950 text-white shadow-xs'
+              ? 'bg-blue-950 text-white shadow-xs'
               : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          <Palette className="w-4 h-4 text-emerald-400" />
+          <Palette className="w-4 h-4 text-blue-400" />
           <span>Brand Colors & Surfaces</span>
         </button>
       </div>
@@ -1142,7 +1142,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div>
                   <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                    <ImageIcon className="w-4 h-4 text-emerald-800" />
+                    <ImageIcon className="w-4 h-4 text-blue-800" />
                     <span>Logo Source: Import File or Image URL</span>
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
@@ -1154,7 +1154,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                     formTheme.sidebarLogoType === 'image' 
-                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                      ? 'bg-blue-100 text-blue-900 border border-blue-300'
                       : 'bg-slate-100 text-slate-700 border border-slate-300'
                   }`}>
                     {formTheme.sidebarLogoType === 'image' ? 'Custom Image Active' : 'Vector Icon Active'}
@@ -1169,7 +1169,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                   onClick={() => setLogoSourceTab('upload')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     logoSourceTab === 'upload'
-                      ? 'bg-emerald-900 text-white shadow-2xs'
+                      ? 'bg-blue-900 text-white shadow-2xs'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -1182,7 +1182,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                   onClick={() => setLogoSourceTab('url')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     logoSourceTab === 'url'
-                      ? 'bg-emerald-900 text-white shadow-2xs'
+                      ? 'bg-blue-900 text-white shadow-2xs'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -1195,7 +1195,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                   onClick={() => setLogoSourceTab('preset')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                     logoSourceTab === 'preset'
-                      ? 'bg-emerald-900 text-white shadow-2xs'
+                      ? 'bg-blue-900 text-white shadow-2xs'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -1217,9 +1217,9 @@ export const WebsiteAppearanceManager: React.FC = () => {
 
                   <div 
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-emerald-300 hover:border-emerald-600 rounded-xl p-6 text-center bg-emerald-50/30 hover:bg-emerald-50/60 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group"
+                    className="border-2 border-dashed border-blue-300 hover:border-blue-600 rounded-xl p-6 text-center bg-blue-50/30 hover:bg-blue-50/60 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group"
                   >
-                    <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center group-hover:scale-110 transition-transform shadow-xs">
+                    <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center group-hover:scale-110 transition-transform shadow-xs">
                       <Upload className="w-6 h-6" />
                     </div>
                     <div>
@@ -1234,7 +1234,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
 
                   {/* Uploaded File Ready State */}
                   {uploadedFilePreview && (
-                    <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <div 
                           className="w-12 h-12 rounded-xl flex items-center justify-center p-1.5 shadow-xs border shrink-0"
@@ -1267,7 +1267,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                         <button
                           type="button"
                           onClick={handleApplyUploadedLogo}
-                          className="px-3.5 py-1.5 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
+                          className="px-3.5 py-1.5 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
                         >
                           <Check className="w-3.5 h-3.5" />
                           <span>Apply Uploaded Logo</span>
@@ -1347,7 +1347,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                         type="button"
                         onClick={() => handleApplyUrlLogo()}
                         disabled={urlError}
-                        className="px-3.5 py-1.5 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                        className="px-3.5 py-1.5 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
                       >
                         <Check className="w-3.5 h-3.5" />
                         <span>Apply URL Logo</span>
@@ -1366,7 +1366,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                           key={sample.name}
                           type="button"
                           onClick={() => handleApplyUrlLogo(sample.url, sample.name)}
-                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:border-emerald-700 text-[11px] font-semibold flex items-center gap-2 cursor-pointer shadow-2xs"
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:border-blue-700 text-[11px] font-semibold flex items-center gap-2 cursor-pointer shadow-2xs"
                         >
                           <div 
                             className="w-5 h-5 rounded flex items-center justify-center p-0.5"
@@ -1399,7 +1399,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                           onClick={() => handleApplyPresetVectorIcon(opt.id, opt.label)}
                           className={`p-2.5 rounded-lg border text-left flex items-center gap-2 transition-all cursor-pointer text-xs ${
                             isSelected
-                              ? 'border-emerald-800 bg-emerald-50 text-emerald-950 font-bold ring-1 ring-emerald-800'
+                              ? 'border-blue-800 bg-blue-50 text-blue-950 font-bold ring-1 ring-blue-800'
                               : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                           }`}
                         >
@@ -1423,7 +1423,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div>
                   <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                    <History className="w-4 h-4 text-emerald-800" />
+                    <History className="w-4 h-4 text-blue-800" />
                     <span>Logo Icon History ({historyItems.length})</span>
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
@@ -1464,7 +1464,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                         onClick={() => handleSelectHistoryItem(item)}
                         className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                           isCurrentlyActive
-                            ? 'border-emerald-800 bg-emerald-50/60 ring-2 ring-emerald-800/20 shadow-xs'
+                            ? 'border-blue-800 bg-blue-50/60 ring-2 ring-blue-800/20 shadow-xs'
                             : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
                         }`}
                       >
@@ -1492,7 +1492,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                                 {item.name}
                               </span>
                               {isCurrentlyActive && (
-                                <span className="px-1.5 py-0.2 rounded-full bg-emerald-800 text-white font-extrabold text-[9px] uppercase shrink-0">
+                                <span className="px-1.5 py-0.2 rounded-full bg-blue-800 text-white font-extrabold text-[9px] uppercase shrink-0">
                                   Active
                                 </span>
                               )}
@@ -1530,7 +1530,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                    <Palette className="w-4 h-4 text-emerald-800" />
+                    <Palette className="w-4 h-4 text-blue-800" />
                     <span>Sidebar Logo Badge & Surface Styling</span>
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
@@ -1540,7 +1540,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleResetSidebarDefaults}
-                  className="text-xs font-semibold text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-semibold text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <RotateCcw className="w-3 h-3" />
                   <span>Default SLSU</span>
@@ -1548,7 +1548,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               </div>
 
               {/* 1. Logo Icon Color */}
-              <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/30 space-y-3">
+              <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/30 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <label className="block font-bold text-xs text-slate-900">
@@ -1699,7 +1699,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                           onClick={() => updateField('sidebarLogoShape', shape.id)}
                           className={`w-full p-2.5 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer text-xs ${
                             isSelected
-                              ? 'border-emerald-800 bg-emerald-50 text-emerald-950 font-bold ring-1 ring-emerald-800'
+                              ? 'border-blue-800 bg-blue-50 text-blue-950 font-bold ring-1 ring-blue-800'
                               : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                           }`}
                         >
@@ -1712,7 +1712,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                             </div>
                             <span>{shape.label}</span>
                           </div>
-                          {isSelected && <Check className="w-4 h-4 text-emerald-800" />}
+                          {isSelected && <Check className="w-4 h-4 text-blue-800" />}
                         </button>
                       );
                     })}
@@ -1761,7 +1761,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
             {/* SECTION 4: SIDEBAR CONTAINER & MENU COLORS */}
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
               <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2 pb-2 border-b border-slate-100">
-                <Layout className="w-4 h-4 text-emerald-800" />
+                <Layout className="w-4 h-4 text-blue-800" />
                 <span>Sidebar Background & Menu Surfaces</span>
               </h3>
 
@@ -1786,7 +1786,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     />
                   </div>
                   <div className="flex gap-1.5 mt-1.5">
-                    {['#ffffff', '#f8fafc', '#0f172a', '#022c22'].map(c => (
+                    {['#ffffff', '#f8fafc', '#0f172a', '#0056A6'].map(c => (
                       <button
                         key={c}
                         type="button"
@@ -1907,7 +1907,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                   type="button"
                   onClick={() => handleSaveTheme()}
                   disabled={isSaving || role !== 'admin'}
-                  className="px-5 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-5 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <Check className="w-4 h-4" />
                   <span>{isSaving ? 'Saving Sidebar...' : 'Save Sidebar Configuration'}</span>
@@ -1922,7 +1922,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div>
                   <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                    <Eye className="w-4 h-4 text-emerald-800" />
+                    <Eye className="w-4 h-4 text-blue-800" />
                     <span>Live Sidebar Preview</span>
                   </h3>
                   <p className="text-[11px] text-slate-500">
@@ -1937,7 +1937,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                       type="button"
                       onClick={() => setPreviewDevice(device)}
                       aria-pressed={previewDevice === device}
-                      className={`px-2 py-1 rounded-md text-[11px] font-semibold capitalize ${previewDevice === device ? 'bg-emerald-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                      className={`px-2 py-1 rounded-md text-[11px] font-semibold capitalize ${previewDevice === device ? 'bg-blue-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                     >
                       {device}
                     </button>
@@ -2155,7 +2155,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div>
                 <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                  <Sliders className="w-4 h-4 text-emerald-800" />
+                  <Sliders className="w-4 h-4 text-blue-800" />
                   <span>1-Click Typographic Scale Presets</span>
                 </h3>
                 <p className="text-xs text-slate-500">
@@ -2166,7 +2166,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <button
                 type="button"
                 onClick={handleResetTypography}
-                className="text-xs font-semibold text-emerald-800 hover:underline flex items-center gap-1"
+                className="text-xs font-semibold text-blue-800 hover:underline flex items-center gap-1"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>Default Standard</span>
@@ -2188,16 +2188,16 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     onClick={() => applyScalePreset(preset.factor)}
                     className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
                       isActive
-                        ? 'border-emerald-800 bg-emerald-50/50 ring-2 ring-emerald-800/20'
+                        ? 'border-blue-800 bg-blue-50/50 ring-2 ring-blue-800/20'
                         : 'border-slate-200 hover:border-slate-300 bg-white'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-slate-900">{preset.label}</span>
-                      {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-800" />}
+                      {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-blue-800" />}
                     </div>
                     <span className="text-[10px] text-slate-500 mt-1 block">{preset.desc}</span>
-                    <span className="text-[10px] font-mono font-bold text-emerald-800 mt-1.5 block">
+                    <span className="text-[10px] font-mono font-bold text-blue-800 mt-1.5 block">
                       {preset.factor}x Ratio
                     </span>
                   </button>
@@ -2211,7 +2211,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div>
                 <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                  <Eye className="w-4 h-4 text-emerald-800" />
+                  <Eye className="w-4 h-4 text-blue-800" />
                   <span>Live Typography System Preview</span>
                 </h3>
                 <p className="text-xs text-slate-500">
@@ -2257,7 +2257,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     Overall Satisfaction Mean
                   </span>
                   <div 
-                    className="font-extrabold text-emerald-900 font-mono my-0.5"
+                    className="font-extrabold text-blue-900 font-mono my-0.5"
                     style={{ fontSize: `${currentTypo.metricNumberSize}rem` }}
                   >
                     4.82 / 5.0
@@ -2346,7 +2346,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    className="px-3.5 py-1.5 rounded-md bg-emerald-900 font-bold text-white shadow-xs cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-md bg-blue-900 font-bold text-white shadow-xs cursor-pointer"
                     style={{ fontSize: `${currentTypo.buttonTextSize}rem` }}
                   >
                     Primary Action Trigger
@@ -2440,10 +2440,10 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                    <Palette className="w-4 h-4 text-emerald-800" />
+                    <Palette className="w-4 h-4 text-blue-800" />
                     <span>System-Wide Font Color Customization</span>
                   </h3>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-bold">
                     WCAG AAA Ready
                   </span>
                 </div>
@@ -2455,7 +2455,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <button
                 type="button"
                 onClick={handleResetFontColors}
-                className="text-xs font-semibold text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                className="text-xs font-semibold text-blue-800 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>Reset Font Colors</span>
@@ -2480,14 +2480,14 @@ export const WebsiteAppearanceManager: React.FC = () => {
                       onClick={() => applyFontColorScheme(scheme)}
                       className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
                         isActive
-                          ? 'border-emerald-800 bg-emerald-50/50 ring-2 ring-emerald-800/20 shadow-xs'
+                          ? 'border-blue-800 bg-blue-50/50 ring-2 ring-blue-800/20 shadow-xs'
                           : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/50'
                       }`}
                     >
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="font-bold text-xs text-slate-900 line-clamp-1">{scheme.name}</span>
-                          {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-800 shrink-0" />}
+                          {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-blue-800 shrink-0" />}
                         </div>
                         <div className="flex items-center gap-1.5 mb-2">
                           <div className="w-4 h-4 rounded-full border border-slate-300 shadow-2xs" style={{ backgroundColor: scheme.titleColor }} title="Title Color" />
@@ -2547,7 +2547,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                         type="button"
                         onClick={() => updateTypoColorField('pageTitleColor', swatch.color)}
                         className={`w-5 h-5 rounded border shadow-2xs cursor-pointer transition-transform hover:scale-110 ${
-                          previewTitleColor.toLowerCase() === swatch.color.toLowerCase() ? 'ring-2 ring-emerald-800' : 'border-slate-300'
+                          previewTitleColor.toLowerCase() === swatch.color.toLowerCase() ? 'ring-2 ring-blue-800' : 'border-slate-300'
                         }`}
                         style={{ backgroundColor: swatch.color }}
                         title={`${swatch.name} (${swatch.color})`}
@@ -2605,7 +2605,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                         type="button"
                         onClick={() => updateTypoColorField('sectionHeadingColor', swatch.color)}
                         className={`w-5 h-5 rounded border shadow-2xs cursor-pointer transition-transform hover:scale-110 ${
-                          previewHeadingColor.toLowerCase() === swatch.color.toLowerCase() ? 'ring-2 ring-emerald-800' : 'border-slate-300'
+                          previewHeadingColor.toLowerCase() === swatch.color.toLowerCase() ? 'ring-2 ring-blue-800' : 'border-slate-300'
                         }`}
                         style={{ backgroundColor: swatch.color }}
                         title={`${swatch.name} (${swatch.color})`}
@@ -2663,7 +2663,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                         type="button"
                         onClick={() => updateTypoColorField('bodyTextColor', swatch.color)}
                         className={`w-5 h-5 rounded border shadow-2xs cursor-pointer transition-transform hover:scale-110 ${
-                          previewBodyColor.toLowerCase() === swatch.color.toLowerCase() ? 'ring-2 ring-emerald-800' : 'border-slate-300'
+                          previewBodyColor.toLowerCase() === swatch.color.toLowerCase() ? 'ring-2 ring-blue-800' : 'border-slate-300'
                         }`}
                         style={{ backgroundColor: swatch.color }}
                         title={`${swatch.name} (${swatch.color})`}
@@ -2721,7 +2721,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                         type="button"
                         onClick={() => updateTypoColorField('mutedTextColor', swatch.color)}
                         className={`w-5 h-5 rounded border shadow-2xs cursor-pointer transition-transform hover:scale-110 ${
-                          previewMutedColor.toLowerCase() === swatch.color.toLowerCase() ? 'ring-2 ring-emerald-800' : 'border-slate-300'
+                          previewMutedColor.toLowerCase() === swatch.color.toLowerCase() ? 'ring-2 ring-blue-800' : 'border-slate-300'
                         }`}
                         style={{ backgroundColor: swatch.color }}
                         title={`${swatch.name} (${swatch.color})`}
@@ -2779,7 +2779,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                         type="button"
                         onClick={() => updateTypoColorField('labelTextColor', swatch.color)}
                         className={`w-5 h-5 rounded border shadow-2xs cursor-pointer transition-transform hover:scale-110 ${
-                          previewLabelColor.toLowerCase() === swatch.color.toLowerCase() ? 'ring-2 ring-emerald-800' : 'border-slate-300'
+                          previewLabelColor.toLowerCase() === swatch.color.toLowerCase() ? 'ring-2 ring-blue-800' : 'border-slate-300'
                         }`}
                         style={{ backgroundColor: swatch.color }}
                         title={`${swatch.name} (${swatch.color})`}
@@ -2800,17 +2800,17 @@ export const WebsiteAppearanceManager: React.FC = () => {
               </div>
 
               {/* 6. Typography Summary & Accessibility Card */}
-              <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-2 flex flex-col justify-between">
+              <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/40 space-y-2 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-1.5 mb-1">
-                    <ShieldCheck className="w-4 h-4 text-emerald-800" />
+                    <ShieldCheck className="w-4 h-4 text-blue-800" />
                     <span className="font-bold text-slate-900 text-xs">Accessibility & Global Persistence</span>
                   </div>
                   <p className="text-[11px] text-slate-600 leading-relaxed">
                     Custom font colors are mapped to centralized CSS design tokens (<code>--font-color-title</code>, <code>--font-color-heading</code>, <code>--font-color-body</code>, <code>--font-color-muted</code>, <code>--font-color-label</code>).
                   </p>
                 </div>
-                <div className="p-2.5 rounded bg-white border border-emerald-200 text-[10px] text-slate-700 space-y-1">
+                <div className="p-2.5 rounded bg-white border border-blue-200 text-[10px] text-slate-700 space-y-1">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold">Current Title Color:</span>
                     <span className="font-mono font-bold">{previewTitleColor}</span>
@@ -2819,7 +2819,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     <span className="font-semibold">Current Body Color:</span>
                     <span className="font-mono font-bold">{previewBodyColor}</span>
                   </div>
-                  <div className="flex justify-between items-center text-emerald-800 font-bold">
+                  <div className="flex justify-between items-center text-blue-800 font-bold">
                     <span>Contrast Standard:</span>
                     <span>WCAG AAA Compliant</span>
                   </div>
@@ -2847,7 +2847,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex justify-between items-baseline">
                   <span className="font-bold text-slate-900">Base Root Font Size (Global Root Scale)</span>
-                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="font-mono font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                     {currentTypo.baseFontSize} rem ({Math.round(currentTypo.baseFontSize * 16)}px)
                   </span>
                 </div>
@@ -2860,7 +2860,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     step="0.025"
                     value={currentTypo.baseFontSize}
                     onChange={(e) => updateTypoField('baseFontSize', parseFloat(e.target.value))}
-                    className="flex-1 accent-emerald-800 cursor-pointer"
+                    className="flex-1 accent-blue-800 cursor-pointer"
                   />
                   <input
                     type="number"
@@ -2878,7 +2878,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex justify-between items-baseline">
                   <span className="font-bold text-slate-900">Main Page Title Size</span>
-                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="font-mono font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                     {currentTypo.pageTitleSize} rem ({Math.round(currentTypo.pageTitleSize * 16)}px)
                   </span>
                 </div>
@@ -2891,7 +2891,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     step="0.05"
                     value={currentTypo.pageTitleSize}
                     onChange={(e) => updateTypoField('pageTitleSize', parseFloat(e.target.value))}
-                    className="flex-1 accent-emerald-800 cursor-pointer"
+                    className="flex-1 accent-blue-800 cursor-pointer"
                   />
                   <input
                     type="number"
@@ -2909,7 +2909,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex justify-between items-baseline">
                   <span className="font-bold text-slate-900">Section Headings & Subtitles</span>
-                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="font-mono font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                     {currentTypo.sectionHeadingSize} rem ({Math.round(currentTypo.sectionHeadingSize * 16)}px)
                   </span>
                 </div>
@@ -2922,7 +2922,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     step="0.025"
                     value={currentTypo.sectionHeadingSize}
                     onChange={(e) => updateTypoField('sectionHeadingSize', parseFloat(e.target.value))}
-                    className="flex-1 accent-emerald-800 cursor-pointer"
+                    className="flex-1 accent-blue-800 cursor-pointer"
                   />
                   <input
                     type="number"
@@ -2940,7 +2940,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex justify-between items-baseline">
                   <span className="font-bold text-slate-900">Body Text & Descriptions</span>
-                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="font-mono font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                     {currentTypo.bodyTextSize} rem ({Math.round(currentTypo.bodyTextSize * 16)}px)
                   </span>
                 </div>
@@ -2953,7 +2953,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     step="0.025"
                     value={currentTypo.bodyTextSize}
                     onChange={(e) => updateTypoField('bodyTextSize', parseFloat(e.target.value))}
-                    className="flex-1 accent-emerald-800 cursor-pointer"
+                    className="flex-1 accent-blue-800 cursor-pointer"
                   />
                   <input
                     type="number"
@@ -2971,7 +2971,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex justify-between items-baseline">
                   <span className="font-bold text-slate-900">Form Labels & Input Captions</span>
-                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="font-mono font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                     {currentTypo.labelSize} rem ({Math.round(currentTypo.labelSize * 16)}px)
                   </span>
                 </div>
@@ -2984,7 +2984,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     step="0.025"
                     value={currentTypo.labelSize}
                     onChange={(e) => updateTypoField('labelSize', parseFloat(e.target.value))}
-                    className="flex-1 accent-emerald-800 cursor-pointer"
+                    className="flex-1 accent-blue-800 cursor-pointer"
                   />
                   <input
                     type="number"
@@ -3002,7 +3002,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex justify-between items-baseline">
                   <span className="font-bold text-slate-900">Buttons & Action Controls</span>
-                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="font-mono font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                     {currentTypo.buttonTextSize} rem ({Math.round(currentTypo.buttonTextSize * 16)}px)
                   </span>
                 </div>
@@ -3015,7 +3015,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     step="0.025"
                     value={currentTypo.buttonTextSize}
                     onChange={(e) => updateTypoField('buttonTextSize', parseFloat(e.target.value))}
-                    className="flex-1 accent-emerald-800 cursor-pointer"
+                    className="flex-1 accent-blue-800 cursor-pointer"
                   />
                   <input
                     type="number"
@@ -3033,7 +3033,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex justify-between items-baseline">
                   <span className="font-bold text-slate-900">Table Headers & Grid Cells</span>
-                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="font-mono font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                     {currentTypo.tableTextSize} rem ({Math.round(currentTypo.tableTextSize * 16)}px)
                   </span>
                 </div>
@@ -3046,7 +3046,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     step="0.025"
                     value={currentTypo.tableTextSize}
                     onChange={(e) => updateTypoField('tableTextSize', parseFloat(e.target.value))}
-                    className="flex-1 accent-emerald-800 cursor-pointer"
+                    className="flex-1 accent-blue-800 cursor-pointer"
                   />
                   <input
                     type="number"
@@ -3064,7 +3064,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex justify-between items-baseline">
                   <span className="font-bold text-slate-900">Sidebar Menu & Top Bar Labels</span>
-                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="font-mono font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                     {currentTypo.navTextSize} rem ({Math.round(currentTypo.navTextSize * 16)}px)
                   </span>
                 </div>
@@ -3077,7 +3077,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     step="0.025"
                     value={currentTypo.navTextSize}
                     onChange={(e) => updateTypoField('navTextSize', parseFloat(e.target.value))}
-                    className="flex-1 accent-emerald-800 cursor-pointer"
+                    className="flex-1 accent-blue-800 cursor-pointer"
                   />
                   <input
                     type="number"
@@ -3095,7 +3095,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex justify-between items-baseline">
                   <span className="font-bold text-slate-900">Dashboard Metrics & KPI Numbers</span>
-                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="font-mono font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                     {currentTypo.metricNumberSize} rem ({Math.round(currentTypo.metricNumberSize * 16)}px)
                   </span>
                 </div>
@@ -3108,7 +3108,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     step="0.05"
                     value={currentTypo.metricNumberSize}
                     onChange={(e) => updateTypoField('metricNumberSize', parseFloat(e.target.value))}
-                    className="flex-1 accent-emerald-800 cursor-pointer"
+                    className="flex-1 accent-blue-800 cursor-pointer"
                   />
                   <input
                     type="number"
@@ -3126,7 +3126,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex justify-between items-baseline">
                   <span className="font-bold text-slate-900">Badges, Micro-copy & Footers</span>
-                  <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="font-mono font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                     {currentTypo.smallTextSize} rem ({Math.round(currentTypo.smallTextSize * 16)}px)
                   </span>
                 </div>
@@ -3139,7 +3139,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     step="0.025"
                     value={currentTypo.smallTextSize}
                     onChange={(e) => updateTypoField('smallTextSize', parseFloat(e.target.value))}
-                    className="flex-1 accent-emerald-800 cursor-pointer"
+                    className="flex-1 accent-blue-800 cursor-pointer"
                   />
                   <input
                     type="number"
@@ -3176,7 +3176,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                   type="button"
                   onClick={() => handleSaveTheme()}
                   disabled={isSaving || role !== 'admin'}
-                  className="px-5 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-5 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <Check className="w-4 h-4" />
                   <span>{isSaving ? 'Applying System Typography...' : 'Save Typography Settings'}</span>
@@ -3213,14 +3213,14 @@ export const WebsiteAppearanceManager: React.FC = () => {
                     onClick={() => handleApplyPreset(preset)}
                     className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
                       isSelected
-                        ? 'border-emerald-800 bg-emerald-50/40 ring-2 ring-emerald-800/20 shadow-xs'
+                        ? 'border-blue-800 bg-blue-50/40 ring-2 ring-blue-800/20 shadow-xs'
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
                     }`}
                   >
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-bold text-xs text-slate-900">{preset.name}</span>
-                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-800 shrink-0" />}
+                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-blue-800 shrink-0" />}
                       </div>
                       <div className="flex items-center gap-1.5 mb-2">
                         {preset.previewColors.map((color, i) => (
@@ -3419,7 +3419,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                    <Type className="w-4 h-4 text-emerald-800" />
+                    <Type className="w-4 h-4 text-blue-800" />
                     <span>Global Typography Font Colors</span>
                   </h3>
                   <p className="text-xs text-slate-500">
@@ -3429,7 +3429,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setActiveTab('typography')}
-                  className="text-xs font-semibold text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-semibold text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Sliders className="w-3.5 h-3.5" />
                   <span>Open Full Typography Suite</span>
@@ -3559,7 +3559,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSaving || role !== 'admin'}
-                className="px-5 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                className="px-5 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
               >
                 <Check className="w-4 h-4" />
                 <span>{isSaving ? 'Applying Changes...' : 'Apply & Save Theme'}</span>

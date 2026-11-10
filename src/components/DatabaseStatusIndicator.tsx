@@ -61,7 +61,7 @@ export const DatabaseStatusIndicator: React.FC<DatabaseStatusIndicatorProps> = (
         )}
         className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold ${
           status === 'connected'
-            ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+            ? 'bg-blue-50 text-blue-900 border-blue-300'
             : status === 'disconnected'
               ? 'bg-rose-50 text-rose-900 border-rose-300'
               : 'bg-slate-50 text-slate-600 border-slate-300'

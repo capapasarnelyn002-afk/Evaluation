@@ -144,7 +144,7 @@ export const ACTIVITY_SPECIFIC_QUESTIONS: Record<ActivityType, QuestionDefinitio
 
 export const TOPIC_LABELS: Record<string, { label: string; color: string; icon: string }> = {
   facilities: { label: 'Facilities & Internet/Venue', color: 'bg-amber-100 text-amber-800 border-amber-300', icon: 'Building' },
-  speaker_mastery: { label: 'Trainer & Speaker Mastery', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: 'UserCheck' },
+  speaker_mastery: { label: 'Trainer & Speaker Mastery', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: 'UserCheck' },
   learning_materials: { label: 'Learning Materials & Handouts', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: 'BookOpen' },
   logistics: { label: 'Logistics, Snacks & Kits', color: 'bg-orange-100 text-orange-800 border-orange-300', icon: 'Package' },
   time_management: { label: 'Time Management & Pacing', color: 'bg-purple-100 text-purple-800 border-purple-300', icon: 'Clock' },

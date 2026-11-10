@@ -213,7 +213,7 @@ export const AdminSurveyManager: React.FC = () => {
       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <ClipboardList className="w-5 h-5 text-emerald-800" />
+            <ClipboardList className="w-5 h-5 text-blue-800" />
             <span>Community Surveys & Feedback Management</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -222,7 +222,7 @@ export const AdminSurveyManager: React.FC = () => {
         </div>
         <button
           onClick={openCreateModal}
-          className="px-4 py-2.5 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
+          className="px-4 py-2.5 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>Create New Survey</span>
@@ -237,11 +237,11 @@ export const AdminSurveyManager: React.FC = () => {
           <div className="text-[11px] text-slate-500 mt-0.5">Configured in registry</div>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <div className="text-xs font-semibold text-emerald-800 uppercase">Published & Active</div>
-          <div className="text-2xl font-black text-emerald-800 mt-1">
+          <div className="text-xs font-semibold text-blue-800 uppercase">Published & Active</div>
+          <div className="text-2xl font-black text-blue-800 mt-1">
             {surveys.filter(s => s.status === 'published').length}
           </div>
-          <div className="text-[11px] text-emerald-700 mt-0.5">Accepting community responses</div>
+          <div className="text-[11px] text-blue-700 mt-0.5">Accepting community responses</div>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
           <div className="text-xs font-semibold text-amber-700 uppercase">Draft Surveys</div>
@@ -268,7 +268,7 @@ export const AdminSurveyManager: React.FC = () => {
             placeholder="Search surveys by title or description..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-emerald-700 text-slate-800"
+            className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-blue-700 text-slate-800"
           />
         </div>
 
@@ -304,7 +304,7 @@ export const AdminSurveyManager: React.FC = () => {
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider border ${
                     isPublished 
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                      ? 'bg-blue-50 text-blue-800 border-blue-300'
                       : isDraft 
                       ? 'bg-amber-50 text-amber-800 border-amber-300' 
                       : 'bg-slate-100 text-slate-600 border-slate-300'
@@ -505,7 +505,7 @@ export const AdminSurveyManager: React.FC = () => {
                         name="privacy"
                         checked={formIsAnonymous}
                         onChange={() => setFormIsAnonymous(true)}
-                        className="text-emerald-800"
+                        className="text-blue-800"
                       />
                       <span>Anonymous</span>
                     </label>
@@ -515,7 +515,7 @@ export const AdminSurveyManager: React.FC = () => {
                         name="privacy"
                         checked={!formIsAnonymous}
                         onChange={() => setFormIsAnonymous(false)}
-                        className="text-emerald-800"
+                        className="text-blue-800"
                       />
                       <span>Ask Name/Email</span>
                     </label>
@@ -566,7 +566,7 @@ export const AdminSurveyManager: React.FC = () => {
                           className="w-full border border-slate-300 rounded p-1.5 text-xs text-slate-900 bg-white"
                         />
                         <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                          <span className="capitalize font-semibold text-emerald-800">{q.type.replace('_', ' ')}</span>
+                          <span className="capitalize font-semibold text-blue-800">{q.type.replace('_', ' ')}</span>
                           <span>·</span>
                           <label className="flex items-center gap-1 cursor-pointer">
                             <input
@@ -603,7 +603,7 @@ export const AdminSurveyManager: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold"
+                  className="px-5 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold"
                 >
                   Save Survey
                 </button>
@@ -619,7 +619,7 @@ export const AdminSurveyManager: React.FC = () => {
           <div className="bg-white rounded-xl shadow-xl max-w-xl w-full p-6 space-y-4 border border-slate-200 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider">Preview Mode</span>
+                <span className="text-[10px] uppercase font-bold text-blue-800 tracking-wider">Preview Mode</span>
                 <h3 className="font-bold text-base text-slate-900">{previewSurvey.title}</h3>
               </div>
               <button onClick={() => setPreviewSurvey(null)} className="p-1 text-slate-400 hover:text-slate-600">
@@ -721,7 +721,7 @@ export const AdminSurveyManager: React.FC = () => {
                   </div>
                   {q.type === 'rating_scale' && (
                     <div className="flex items-center gap-3 text-xs">
-                      <span className="font-bold text-emerald-800 text-sm">4.82 / 5.00 Mean</span>
+                      <span className="font-bold text-blue-800 text-sm">4.82 / 5.00 Mean</span>
                       <span className="text-slate-500">96.4% Highly Satisfied</span>
                     </div>
                   )}
@@ -733,7 +733,7 @@ export const AdminSurveyManager: React.FC = () => {
                         <span>Youth: 20%</span>
                       </div>
                       <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden flex">
-                        <div className="bg-emerald-700 h-full" style={{ width: '48%' }} />
+                        <div className="bg-blue-700 h-full" style={{ width: '48%' }} />
                         <div className="bg-amber-600 h-full" style={{ width: '32%' }} />
                         <div className="bg-blue-600 h-full" style={{ width: '20%' }} />
                       </div>

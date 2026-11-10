@@ -24,10 +24,10 @@ export const CapstoneAboutModal: React.FC = () => {
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200">
         
         {/* Academic Header */}
-        <div className="bg-emerald-950 p-6 text-white text-center relative border-b-2 border-amber-500">
+        <div className="bg-blue-950 p-6 text-white text-center relative border-b-2 border-amber-500">
           <button
             onClick={() => setShowAboutModal(false)}
-            className="absolute top-4 right-4 text-slate-300 hover:text-white p-1 rounded-lg hover:bg-emerald-900 transition-colors cursor-pointer"
+            className="absolute top-4 right-4 text-slate-300 hover:text-white p-1 rounded-lg hover:bg-blue-900 transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />
@@ -40,11 +40,11 @@ export const CapstoneAboutModal: React.FC = () => {
             Faculty of Computer Studies and Information Technology (FCSIT)
           </p>
 
-          <div className="my-4 py-2 border-y border-emerald-900">
+          <div className="my-4 py-2 border-y border-blue-900">
             <h1 id="capstone-dialog-title" className="text-base sm:text-lg font-bold text-white tracking-tight">
               Extension Services Evaluation System with Data Analytics
             </h1>
-            <p className="text-xs text-emerald-300 mt-1">
+            <p className="text-xs text-blue-300 mt-1">
               A Capstone Project in Partial Fulfillment of the Degree of Bachelor of Science in Information Technology (BSIT)
             </p>
           </div>
@@ -61,7 +61,7 @@ export const CapstoneAboutModal: React.FC = () => {
           {/* Researchers */}
           <div>
             <h3 className="font-bold text-xs uppercase tracking-wider text-slate-900 mb-2.5 flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-emerald-800" />
+              <Users className="w-4 h-4 text-blue-800" />
               <span>Project Proponents (FCSIT Researchers)</span>
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -82,7 +82,7 @@ export const CapstoneAboutModal: React.FC = () => {
           {/* Research Objectives */}
           <div>
             <h3 className="font-bold text-xs uppercase tracking-wider text-slate-900 mb-2.5 flex items-center gap-1.5">
-              <CheckCircle className="w-4 h-4 text-emerald-800" />
+              <CheckCircle className="w-4 h-4 text-blue-800" />
               <span>Core Project Objectives</span>
             </h3>
             <ul className="space-y-1.5 list-disc list-inside bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-700 leading-relaxed">
@@ -110,7 +110,7 @@ export const CapstoneAboutModal: React.FC = () => {
           {/* Theoretical Foundations */}
           <div>
             <h3 className="font-bold text-xs uppercase tracking-wider text-slate-900 mb-2.5 flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4 text-emerald-800" />
+              <BookOpen className="w-4 h-4 text-blue-800" />
               <span>Theoretical Frameworks (Chapter II)</span>
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600">
@@ -132,7 +132,7 @@ export const CapstoneAboutModal: React.FC = () => {
           {/* Technologies Used */}
           <div>
             <h3 className="font-bold text-xs uppercase tracking-wider text-slate-900 mb-2 flex items-center gap-1.5">
-              <Cpu className="w-4 h-4 text-emerald-800" />
+              <Cpu className="w-4 h-4 text-blue-800" />
               <span>Implemented Technologies (Chapter III)</span>
             </h3>
             <div className="flex flex-wrap gap-1.5 text-[11px]">

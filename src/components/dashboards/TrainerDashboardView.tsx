@@ -108,7 +108,7 @@ export const TrainerDashboardView: React.FC = () => {
                         <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-900 border border-blue-200">
                           {act.activityType}
                         </span>
-                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
+                        <span className="text-[10px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded">
                           {act.status}
                         </span>
                       </div>
@@ -182,8 +182,8 @@ export const TrainerDashboardView: React.FC = () => {
 
                   <div className="space-y-2 text-xs">
                     <div>
-                      <span className="font-bold text-emerald-900 block text-[11px]">Key Strengths Noted:</span>
-                      <p className="text-slate-700 italic bg-emerald-50/50 p-2.5 rounded border border-emerald-100">
+                      <span className="font-bold text-blue-900 block text-[11px]">Key Strengths Noted:</span>
+                      <p className="text-slate-700 italic bg-blue-50/50 p-2.5 rounded border border-blue-100">
                         "{e.comments.strengths || 'The trainer explained every step clearly and showed genuine patience during the practical computer hands-on.'}"
                       </p>
                     </div>
@@ -239,10 +239,10 @@ export const TrainerDashboardView: React.FC = () => {
                       <td className="px-4 py-3.5 text-center font-medium text-slate-500 tabular-nums">
                         ≥{dim.benchmark.toFixed(2)}
                       </td>
-                      <td className="px-4 py-3.5 font-semibold text-emerald-800">{dim.grade}</td>
+                      <td className="px-4 py-3.5 font-semibold text-blue-800">{dim.grade}</td>
                       <td className="px-4 py-3.5">
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold text-[10px] flex items-center gap-1 w-max">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                        <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 font-bold text-[10px] flex items-center gap-1 w-max">
+                          <CheckCircle2 className="w-3 h-3 text-blue-700" />
                           <span>Compliant</span>
                         </span>
                       </td>
@@ -264,13 +264,13 @@ export const TrainerDashboardView: React.FC = () => {
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
                   <span className="font-semibold uppercase tracking-wider">Trainer Overall Rating</span>
-                  <span className="text-emerald-800 font-bold">Target ≥4.00</span>
+                  <span className="text-blue-800 font-bold">Target ≥4.00</span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-extrabold text-blue-950 tabular-nums">{overallTrainerScore}</span>
                   <span className="text-xs text-slate-400">/ 5.00</span>
                 </div>
-                <div className="mt-2 text-xs text-emerald-800 font-medium flex items-center gap-1">
+                <div className="mt-2 text-xs text-blue-800 font-medium flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Ranked Outstanding across all cohorts</span>
                 </div>
@@ -307,13 +307,13 @@ export const TrainerDashboardView: React.FC = () => {
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
                   <span className="font-semibold uppercase tracking-wider">Objectives Attained</span>
-                  <span className="text-emerald-800 font-bold">Learner Impact</span>
+                  <span className="text-blue-800 font-bold">Learner Impact</span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-extrabold text-slate-900 tabular-nums">{objectivesAttained}</span>
                   <span className="text-xs text-slate-400">/ 5.00</span>
                 </div>
-                <div className="mt-2 text-xs text-emerald-800 font-medium flex items-center gap-1">
+                <div className="mt-2 text-xs text-blue-800 font-medium flex items-center gap-1">
                   <TrendingUp className="w-3.5 h-3.5" />
                   <span>98% practical skill comprehension</span>
                 </div>
@@ -351,7 +351,7 @@ export const TrainerDashboardView: React.FC = () => {
                       />
                     </div>
                     <div className="flex justify-between items-center text-[11px] text-slate-500 pt-1">
-                      <span>Status: <strong className="text-emerald-800">{dim.grade}</strong></span>
+                      <span>Status: <strong className="text-blue-800">{dim.grade}</strong></span>
                       <span>Target: ≥{dim.benchmark.toFixed(2)}</span>
                     </div>
                   </div>

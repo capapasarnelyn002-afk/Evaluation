@@ -95,7 +95,7 @@ export const AdminAccountView: React.FC = () => {
         {/* Profile Information */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
           <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2 pb-3 border-b border-slate-100">
-            <UserCheck className="w-4 h-4 text-emerald-800" />
+            <UserCheck className="w-4 h-4 text-blue-800" />
             <span>Administrator Profile Details</span>
           </h3>
 
@@ -145,7 +145,7 @@ export const AdminAccountView: React.FC = () => {
             <div className="pt-2">
               <button
                 type="submit"
-                className="px-4 py-2 rounded-lg bg-emerald-900 hover:bg-emerald-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                className="px-4 py-2 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Save Profile Changes</span>
@@ -200,7 +200,7 @@ export const AdminAccountView: React.FC = () => {
             {/* 2FA Toggle */}
             <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <Smartphone className="w-4 h-4 text-emerald-800" />
+                <Smartphone className="w-4 h-4 text-blue-800" />
                 <div>
                   <span className="font-bold text-slate-900 block text-xs">Two-Factor Authentication (2FA)</span>
                   <span className="text-[11px] text-slate-500">Require mobile OTP for institutional audits</span>
@@ -210,7 +210,7 @@ export const AdminAccountView: React.FC = () => {
                 type="button"
                 onClick={() => setTwoFactorEnabled(!twoFactorEnabled)}
                 className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                  twoFactorEnabled ? 'bg-emerald-800' : 'bg-slate-300'
+                  twoFactorEnabled ? 'bg-blue-800' : 'bg-slate-300'
                 }`}
               >
                 <span
@@ -239,7 +239,7 @@ export const AdminAccountView: React.FC = () => {
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>
             <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-800" />
+              <ShieldCheck className="w-4 h-4 text-blue-800" />
               <span>Personal Administrative Audit Trail</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">

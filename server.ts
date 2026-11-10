@@ -1,7 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
 dotenv.config({ path: ['.env.local', '.env'] });
@@ -10,12 +10,15 @@ export const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '10mb' }));
+app.set('trust proxy', 1);
 
 const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL)?.replace(/\/+$/, '');
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_SECRET;
 const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 let persistenceQueue = Promise.resolve();
+let lastSnapshotHydratedAt = 0;
+let snapshotRefreshPromise: Promise<void> | undefined;
 
 app.use((req, res, next) => {
   const isStateMutation =
@@ -52,6 +55,23 @@ app.use((req, res, next) => {
   }
 
   next();
+});
+
+app.use('/api', async (req, res, next) => {
+  if (req.method === 'GET') res.setHeader('Cache-Control', 'no-store');
+  if (['/health', '/database/status', '/auth/logout'].includes(req.path)) return next();
+
+  try {
+    await persistenceQueue;
+    if (Date.now() - lastSnapshotHydratedAt > 1000) {
+      snapshotRefreshPromise ||= hydrateServerState().finally(() => { snapshotRefreshPromise = undefined; });
+      await snapshotRefreshPromise;
+    }
+    return next();
+  } catch (error) {
+    console.error('Failed to synchronize application state from Supabase:', error);
+    return res.status(503).json({ error: 'The application database is temporarily unavailable.' });
+  }
 });
 
 // Initialize Gemini SDK with User-Agent as instructed by skill
@@ -186,7 +206,13 @@ async function getAuthenticatedAccount(accessToken: string): Promise<ServerUser 
 }
 
 app.use('/api', async (req, res, next) => {
-  if (['/auth/login', '/auth/me', '/auth/logout', '/database/status', '/health'].includes(req.path)) return next();
+  const isPublicFormRead = req.method === 'GET' && /^\/public\/forms(?:\/[^/]+)?$/.test(req.path);
+  const isPublicSubmission = req.method === 'POST' && /^\/public\/forms\/[^/]+\/submissions$/.test(req.path);
+  if (
+    isPublicFormRead ||
+    isPublicSubmission ||
+    ['/auth/login', '/auth/me', '/auth/logout', '/database/status', '/health'].includes(req.path)
+  ) return next();
 
   const accessToken = req.headers.authorization?.replace(/^Bearer\s+/i, '');
   if (!accessToken) return res.status(401).json({ error: 'A valid sign-in session is required.' });
@@ -196,31 +222,7 @@ app.use('/api', async (req, res, next) => {
     if (!account) return res.status(401).json({ error: 'Your sign-in session is invalid or has expired.' });
     res.locals.user = account;
 
-    const adminOnly =
-      req.path.startsWith('/users') ||
-      (req.path.startsWith('/settings') && req.method !== 'GET') ||
-      req.path.startsWith('/audit-logs') ||
-      req.path.startsWith('/admin/') ||
-      req.path.startsWith('/trainer/') ||
-      req.path.startsWith('/imports/') ||
-      req.path.startsWith('/ai/') ||
-      (req.path.startsWith('/activities') && req.method !== 'GET') ||
-      (req.path.startsWith('/forms') && req.method !== 'GET') ||
-      (req.path.startsWith('/surveys') && (
-        (req.method === 'GET' && req.path.includes('/responses')) ||
-        (req.method !== 'GET' && !(req.method === 'POST' && req.path.endsWith('/responses')))
-      )) ||
-      (req.path.startsWith('/theme') && req.method !== 'GET') ||
-      (req.path.startsWith('/evaluations') && req.method === 'PATCH');
-    if (adminOnly && account.role !== 'admin') {
-      return res.status(403).json({ error: 'Administrator access is required.' });
-    }
-
-    if (req.path === '/evaluations' && req.method === 'POST' &&
-      typeof req.body?.participantEmail === 'string' &&
-      req.body.participantEmail.toLowerCase() !== account.email.toLowerCase()) {
-      return res.status(403).json({ error: 'You can only submit evaluations for your signed-in account.' });
-    }
+    if (account.role !== 'admin') return res.status(403).json({ error: 'Administrator access is required.' });
 
     return next();
   } catch (error) {
@@ -861,6 +863,7 @@ app.post('/api/auth/login', async (req, res) => {
     const user = users.find(account => account.id === authData.user?.id);
     if (!user) return res.status(403).json({ error: 'Your Supabase account does not have an application profile yet.' });
     if (user.status !== 'active') return res.status(403).json({ error: 'This account has been deactivated.' });
+    if (user.role !== 'admin') return res.status(403).json({ error: 'Only administrator accounts can access the system dashboard.' });
     if (!authData.access_token) throw new Error('Supabase authentication response did not include an access token.');
 
     const lastLogin = new Date().toISOString();
@@ -896,6 +899,7 @@ app.get('/api/auth/me', async (req, res) => {
     const authUser = await authResponse.json() as { id?: string };
     const user = users.find(account => account.id === authUser.id);
     if (!user || user.status !== 'active') return res.status(403).json({ error: 'No active application profile is available for this account.' });
+    if (user.role !== 'admin') return res.status(403).json({ error: 'Only administrator accounts can access the system dashboard.' });
     return res.json({ user });
   } catch (error) {
     console.error('Supabase session validation failed:', error);
@@ -929,7 +933,9 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/database/status', async (_req, res) => {
   try {
     await supabaseStateRequest('users?select=id&limit=1');
-    return res.json({ connected: true });
+    await supabaseStateRequest('evaluation_forms?select=id,publicEnabled,expiresAt&limit=1');
+    await supabaseStateRequest('public_evaluation_submission_limits?select=rate_limit_key&limit=1');
+    return res.json({ connected: true, publicEvaluationSchemaReady: true });
   } catch (error) {
     console.error('Supabase database status check failed:', error);
     const message = error instanceof Error ? error.message : '';
@@ -940,7 +946,7 @@ app.get('/api/database/status', async (_req, res) => {
       : message.includes('(401)') || message.includes('(403)')
         ? 'Supabase rejected the server key. Check that SUPABASE_SECRET_KEY belongs to this project and is current.'
         : message.includes('(404)')
-          ? 'The Supabase users table was not found. Run supabase/schema.sql in the Supabase SQL Editor.'
+            ? 'A required application table or public-form schema field was not found. Re-run supabase/schema.sql in the Supabase SQL Editor.'
           : 'Check the Supabase project URL, server key, and database availability.';
     return res.status(503).json({ connected: false, hint });
   }
@@ -1152,6 +1158,248 @@ app.patch('/api/settings', (req, res) => {
 // ==========================================
 let evaluationForms: any[] = [];
 
+function getPublicFormBundle(formId: string) {
+  const form = evaluationForms.find(item => item.id === formId);
+  if (!form || form.status !== 'published' || form.publicEnabled === false) return null;
+
+  const activity = activities.find(item =>
+    item.id === form.activityId || item.assignedFormId === form.id
+  );
+  if (!activity || !['active', 'upcoming'].includes(activity.status)) return null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const expiration = form.expiresAt || activity.deadline;
+  if (expiration && expiration < today) return null;
+
+  return { form, activity };
+}
+
+function isEmptyAnswer(value: unknown) {
+  return value === undefined || value === null || value === '' ||
+    (Array.isArray(value) && value.length === 0);
+}
+
+type PublicValidationQuestion = {
+  id: string;
+  label: string;
+  type: string;
+  required: boolean;
+  options?: string[];
+  criteria?: string[];
+  scaleMin?: number;
+  scaleMax?: number;
+  minSelections?: number;
+  maxSelections?: number;
+};
+
+type PublicValidationForm = {
+  sections: Array<{ questions: PublicValidationQuestion[] }>;
+};
+
+export function validatePublicAnswers(form: PublicValidationForm, answers: unknown): string | null {
+  if (!answers || typeof answers !== 'object' || Array.isArray(answers)) return 'Form answers are required.';
+  const values = answers as Record<string, unknown>;
+  const questions = (form.sections || []).flatMap((section: any) => section.questions || []);
+  const questionIds = new Set(questions.map((question: any) => question.id));
+  if (Object.keys(values).some(id => !questionIds.has(id))) return 'The submission contains answers for unknown questions.';
+
+  for (const question of questions) {
+    const answer = values[question.id];
+    if (['instructions', 'section_title'].includes(question.type)) continue;
+    if (question.required && isEmptyAnswer(answer)) return `A response is required for "${question.label}".`;
+    if (isEmptyAnswer(answer)) continue;
+
+    const options: string[] = Array.isArray(question.options) ? question.options : [];
+    if (['single_choice', 'dropdown'].includes(question.type) && (typeof answer !== 'string' || !options.includes(answer))) {
+      return `The response for "${question.label}" is not an allowed option.`;
+    }
+    if (question.type === 'yes_no' && !['Yes', 'No'].includes(String(answer))) return `The response for "${question.label}" must be Yes or No.`;
+    if (['multiple_choice', 'checkbox_grid'].includes(question.type)) {
+      const selections = question.type === 'multiple_choice' ? answer : Object.values((answer || {}) as object).flatMap(value => Array.isArray(value) ? value : []);
+      if (!Array.isArray(selections) || selections.some(option => typeof option !== 'string' || !options.includes(option))) {
+        return `The response for "${question.label}" contains an invalid option.`;
+      }
+      if (question.type === 'multiple_choice' &&
+        ((question.minSelections !== undefined && selections.length < question.minSelections) ||
+         (question.maxSelections !== undefined && selections.length > question.maxSelections))) {
+        return `The response for "${question.label}" has an invalid number of selections.`;
+      }
+    }
+    if (['rating_scale', 'star_rating', 'likert_scale', 'linear_scale'].includes(question.type)) {
+      const min = question.scaleMin ?? 1;
+      const max = question.scaleMax ?? 5;
+      if (!Number.isInteger(answer) || Number(answer) < min || Number(answer) > max) {
+        return `The response for "${question.label}" must be a whole number from ${min} to ${max}.`;
+      }
+    }
+    if (['rubric_table', 'multiple_choice_grid', 'checkbox_grid'].includes(question.type)) {
+      if (!answer || typeof answer !== 'object' || Array.isArray(answer)) return `The response for "${question.label}" must include valid row responses.`;
+      const rows: string[] = question.criteria || [];
+      const rowAnswers = answer as Record<string, unknown>;
+      if (Object.keys(rowAnswers).some(row => !rows.includes(row))) return `The response for "${question.label}" contains an unknown row.`;
+      for (const row of rows) {
+        const rowAnswer = rowAnswers[row];
+        if (question.required && isEmptyAnswer(rowAnswer)) return `A response is required for every row in "${question.label}".`;
+        if (isEmptyAnswer(rowAnswer)) continue;
+        if (question.type === 'rubric_table') {
+          if (!Number.isInteger(rowAnswer) || Number(rowAnswer) < (question.scaleMin ?? 1) || Number(rowAnswer) > (question.scaleMax ?? 5)) {
+            return `The response for "${question.label}" contains an invalid rating.`;
+          }
+        } else if (question.type === 'multiple_choice_grid') {
+          if (typeof rowAnswer !== 'string' || !options.includes(rowAnswer)) return `The response for "${question.label}" contains an invalid option.`;
+        } else if (!Array.isArray(rowAnswer) || rowAnswer.some(option => typeof option !== 'string' || !options.includes(option))) {
+          return `The response for "${question.label}" contains an invalid option.`;
+        }
+      }
+    }
+    if (['short_text', 'long_text', 'paragraph', 'email', 'date', 'time'].includes(question.type)) {
+      if (typeof answer !== 'string' || answer.length > 10000) return `The response for "${question.label}" must be text of at most 10,000 characters.`;
+      if (question.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(answer)) return `The response for "${question.label}" must be a valid email address.`;
+      if (question.type === 'date') {
+        const date = new Date(`${answer}T00:00:00.000Z`);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(answer) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== answer) {
+          return `The response for "${question.label}" must be a valid date.`;
+        }
+      }
+      if (question.type === 'time' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(answer)) return `The response for "${question.label}" must be a valid time.`;
+    }
+    if (question.type === 'number' && (typeof answer !== 'number' || !Number.isFinite(answer))) return `The response for "${question.label}" must be a number.`;
+    if (typeof answer === 'string' && answer.length > 10000) return `The response for "${question.label}" is too long.`;
+  }
+  return null;
+}
+
+app.get('/api/public/forms', (_req, res) => {
+  const publicForms = evaluationForms.flatMap(form => {
+    const bundle = getPublicFormBundle(form.id);
+    return bundle ? [{
+      id: bundle.form.id,
+      title: bundle.form.title,
+      activityTitle: bundle.activity.title,
+      activityDate: bundle.activity.date,
+      venue: bundle.activity.venue
+    }] : [];
+  });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(publicForms);
+});
+
+app.get('/api/public/forms/:id', (req, res) => {
+  const bundle = getPublicFormBundle(req.params.id);
+  if (!bundle) return res.status(404).json({ error: 'This evaluation form is unavailable or has expired.' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    form: {
+      id: bundle.form.id,
+      title: bundle.form.title,
+      description: bundle.form.description,
+      instructions: bundle.form.instructions,
+      sections: bundle.form.sections,
+      expiresAt: bundle.form.expiresAt || bundle.activity.deadline
+    },
+    activity: {
+      title: bundle.activity.title,
+      description: bundle.activity.description,
+      date: bundle.activity.date,
+      venue: bundle.activity.venue
+    }
+  });
+});
+
+app.post('/api/public/forms/:id/submissions', async (req, res) => {
+  const bundle = getPublicFormBundle(req.params.id);
+  if (!bundle) return res.status(404).json({ error: 'This evaluation form is unavailable or has expired.' });
+
+  const idempotencyKey = req.get('Idempotency-Key') || '';
+  if (!/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(idempotencyKey)) {
+    return res.status(400).json({ error: 'A valid submission token is required. Reload the page and try again.' });
+  }
+  const controlNumber = `PUB-${idempotencyKey}`;
+  const previousSubmission = evaluations.find(item => item.controlNumber === controlNumber);
+  if (previousSubmission) return res.status(200).json({ success: true, submissionId: previousSubmission.id });
+
+  const rateKey = createHash('sha256')
+    .update(`${bundle.form.id}:${req.ip || req.socket.remoteAddress || 'unknown'}`)
+    .digest('hex');
+  try {
+    const rateResponse = await supabaseStateRequest('rpc/reserve_public_evaluation_submission', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_key: rateKey, p_limit: 8, p_window_seconds: 900 })
+    });
+    const allowed = await rateResponse.json() as boolean;
+    if (!allowed) return res.status(429).json({ error: 'Too many submissions from this network. Please try again later.' });
+  } catch (error) {
+    console.error('Public evaluation rate-limit check failed:', error);
+    return res.status(503).json({ error: 'Submissions are temporarily unavailable. Please try again later.' });
+  }
+
+  const validationError = validatePublicAnswers(bundle.form, req.body?.answers);
+  if (validationError) return res.status(400).json({ error: validationError });
+  if (req.body?.consentAccepted !== true) return res.status(400).json({ error: 'Please confirm the privacy notice before submitting.' });
+
+  const answers = req.body.answers as Record<string, unknown>;
+  const commentsInput = typeof req.body?.comments === 'string' ? req.body.comments : '';
+  if (commentsInput.length > 5000) return res.status(400).json({ error: 'Comments must be 5,000 characters or fewer.' });
+  const commentsText = commentsInput.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
+  const questions = (bundle.form.sections || []).flatMap((section: any) => section.questions || []);
+  const specificRatings = Object.fromEntries(questions.flatMap((question: any) => {
+    const answer = answers[question.id];
+    if (['rating_scale', 'star_rating', 'likert_scale', 'linear_scale'].includes(question.type) && Number.isInteger(answer)) return [[question.id, answer]];
+    if (question.type === 'rubric_table' && answer && typeof answer === 'object') {
+      return Object.entries(answer as Record<string, number>).map(([criterion, score]) => [`${question.id}:${criterion}`, score]);
+    }
+    return [];
+  }));
+  let weightedScoreTotal = 0;
+  let totalWeight = 0;
+  for (const question of questions) {
+    const answer = answers[question.id];
+    if (['rating_scale', 'star_rating', 'likert_scale', 'linear_scale'].includes(question.type) && Number.isInteger(answer)) {
+      const weight = question.weight ?? 1;
+      weightedScoreTotal += Number(answer) * weight;
+      totalWeight += weight;
+    } else if (question.type === 'rubric_table' && answer && typeof answer === 'object') {
+      const criteria: string[] = question.criteria || [];
+      const weightPerCriterion = (question.weight ?? criteria.length) / Math.max(criteria.length, 1);
+      for (const criterion of criteria) {
+        const score = (answer as Record<string, unknown>)[criterion];
+        if (Number.isInteger(score)) {
+          weightedScoreTotal += Number(score) * weightPerCriterion;
+          totalWeight += weightPerCriterion;
+        }
+      }
+    }
+  }
+  const meanRating = totalWeight > 0 ? Number((weightedScoreTotal / totalWeight).toFixed(2)) : 0;
+  const sentiments = analyzeSentimentAndTopics(commentsText);
+  const submission: ServerEvaluation = {
+    id: `eval-${randomUUID()}`,
+    activityId: bundle.activity.id,
+    formId: bundle.form.id,
+    formSnapshot: structuredClone(bundle.form),
+    customAnswers: structuredClone(answers),
+    participantName: 'Anonymous Participant',
+    participantEmail: '',
+    participantCategory: 'community_member',
+    controlNumber,
+    verificationMethod: 'public_link',
+    coreRatings: {},
+    specificRatings,
+    meanRating,
+    comments: { strengths: '', improvements: '', suggestions: commentsText },
+    sentiment: sentiments,
+    submissionSource: 'online',
+    submittedAt: new Date().toISOString(),
+    deviceInfo: 'Public evaluation form',
+    verified: false,
+    consentAccepted: true,
+    adminFollowUpStatus: 'none'
+  };
+  evaluations.unshift(submission);
+  return res.status(201).json({ success: true, submissionId: submission.id });
+});
+
 // Forms endpoints
 const completedEvaluationImports = new Map<string, { form: any; activity: ServerActivity }>();
 const completedFormImports = new Map<string, any>();
@@ -1288,6 +1536,12 @@ const validateFormDefinition = (form: any): string | null => {
   if (form.targetActivityType && !validActivityTypes.includes(form.targetActivityType)) return 'Choose a valid target activity type.';
   if (typeof form.description === 'string' && form.description.length > 3000) return 'Form description cannot exceed 3000 characters.';
   if (typeof form.instructions === 'string' && form.instructions.length > 3000) return 'Form instructions cannot exceed 3000 characters.';
+  if (form.publicEnabled !== undefined && typeof form.publicEnabled !== 'boolean') return 'Public submission availability must be enabled or disabled.';
+  if (form.expiresAt !== undefined && form.expiresAt !== null && form.expiresAt !== '') {
+    if (typeof form.expiresAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(form.expiresAt)) return 'Enter a valid public form expiration date.';
+    const expiresAt = new Date(`${form.expiresAt}T00:00:00.000Z`);
+    if (Number.isNaN(expiresAt.getTime()) || expiresAt.toISOString().slice(0, 10) !== form.expiresAt) return 'Enter a valid public form expiration date.';
+  }
   if (!Array.isArray(form.sections) || form.sections.length > 100) return 'A form can contain at most 100 sections.';
   let questionCount = 0;
   const questionIds = new Set<string>();
@@ -1325,6 +1579,9 @@ app.post('/api/forms', (req, res) => {
   const validationError = validateFormDefinition(payload);
   if (validationError) return res.status(400).json({ error: validationError });
   if (payload.activityId && !activities.some(activity => activity.id === payload.activityId)) return res.status(404).json({ error: 'Associated activity not found.' });
+  if (payload.status === 'published' && !activities.some(activity => activity.id === payload.activityId && ['active', 'upcoming'].includes(activity.status))) {
+    return res.status(400).json({ error: 'Assign this form to an active or upcoming extension activity before publishing it.' });
+  }
 
   const now = new Date().toISOString();
   const newForm = {
@@ -1333,6 +1590,8 @@ app.post('/api/forms', (req, res) => {
     description: payload.description || '',
     instructions: payload.instructions || '',
     status: payload.status,
+    publicEnabled: payload.publicEnabled !== false,
+    expiresAt: payload.expiresAt || null,
     version: 1,
     targetActivityType: payload.targetActivityType || 'all',
     activityId: payload.activityId || '',
@@ -1370,6 +1629,8 @@ app.put('/api/forms/:id', (req, res) => {
     description: payload.description ?? existingForm.description,
     instructions: payload.instructions ?? existingForm.instructions,
     status: payload.status ?? existingForm.status,
+    publicEnabled: payload.publicEnabled ?? existingForm.publicEnabled ?? true,
+    expiresAt: Object.hasOwn(payload, 'expiresAt') ? (payload.expiresAt || null) : existingForm.expiresAt,
     targetActivityType: payload.targetActivityType ?? existingForm.targetActivityType,
     activityId: payload.activityId ?? existingForm.activityId,
     targetRespondent: payload.targetRespondent ?? existingForm.targetRespondent,
@@ -1379,6 +1640,12 @@ app.put('/api/forms/:id', (req, res) => {
   const validationError = validateFormDefinition(updatedForm);
   if (validationError) return res.status(400).json({ error: validationError });
   if (updatedForm.activityId && !activities.some(activity => activity.id === updatedForm.activityId)) return res.status(404).json({ error: 'Associated activity not found.' });
+  if (updatedForm.status === 'published' && !activities.some(activity =>
+    (activity.id === updatedForm.activityId || activity.assignedFormId === existingForm.id) &&
+    ['active', 'upcoming'].includes(activity.status)
+  )) {
+    return res.status(400).json({ error: 'Assign this form to an active or upcoming extension activity before publishing it.' });
+  }
   if (existingForm.activityId && existingForm.activityId !== updatedForm.activityId) {
     const previousActivity = activities.find(activity => activity.id === existingForm.activityId);
     if (previousActivity && previousActivity.assignedFormId === existingForm.id) previousActivity.assignedFormId = undefined;
@@ -1428,6 +1695,7 @@ app.post('/api/forms/:id/duplicate', (req, res) => {
     id: `form-${Date.now()}`,
     title: `${orig.title} (Copy)`,
     status: 'draft',
+    publicEnabled: true,
     version: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -1559,29 +1827,29 @@ const DEFAULT_THEME = {
   siteName: 'Southern Leyte State University',
   siteTagline: 'Extension Services Evaluation System & Decision Support',
   logoText: 'SLSU-Hinunangan',
-  primaryColor: '#022c22', // emerald-950
-  secondaryColor: '#065f46', // emerald-800
-  accentColor: '#d97706', // amber-600
-  pageBgColor: '#f8fafc', // slate-50
+  primaryColor: '#0056A6',
+  secondaryColor: '#1976D2',
+  accentColor: '#003366',
+  pageBgColor: '#F5F8FC',
   cardBgColor: '#ffffff',
   sidebarBgColor: '#ffffff',
   sidebarTextColor: '#1e293b',
-  sidebarLogoColor: '#d97706',
-  sidebarLogoBg: '#022c22',
+  sidebarLogoColor: '#FFFFFF',
+  sidebarLogoBg: '#0056A6',
   sidebarLogoTextColor: '#1e293b',
   sidebarLogoType: 'icon',
   sidebarLogoUrl: '',
   sidebarLogoIcon: 'building',
   sidebarLogoShape: 'rounded',
   sidebarLogoHistory: [],
-  sidebarActiveItemBg: '#022c22',
-  sidebarActiveItemText: '#ffffff',
+  sidebarActiveItemBg: '#EAF3FC',
+  sidebarActiveItemText: '#003366',
   sidebarBorderColor: '#e2e8f0',
-  headerBgColor: '#022c22',
-  headerTextColor: '#ffffff',
-  buttonPrimaryBg: '#064e3b',
+  headerBgColor: '#FFFFFF',
+  headerTextColor: '#003366',
+  buttonPrimaryBg: '#0056A6',
   buttonPrimaryText: '#ffffff',
-  linkTextColor: '#065f46',
+  linkTextColor: '#0056A6',
   fontColorTitle: '#0f172a',
   fontColorHeading: '#1e293b',
   fontColorBody: '#334155',
@@ -1611,6 +1879,33 @@ const DEFAULT_THEME = {
 };
 
 let currentTheme = { ...DEFAULT_THEME };
+
+function migrateLegacyTheme(theme: Record<string, unknown>) {
+  const updated = { ...DEFAULT_THEME, ...theme } as typeof DEFAULT_THEME;
+  const replacements: Record<string, [string, string]> = {
+    primaryColor: ['#022c22', '#0056A6'],
+    secondaryColor: ['#065f46', '#1976D2'],
+    accentColor: ['#d97706', '#003366'],
+    pageBgColor: ['#f8fafc', '#F5F8FC'],
+    sidebarLogoColor: ['#d97706', '#FFFFFF'],
+    sidebarLogoBg: ['#022c22', '#0056A6'],
+    sidebarActiveItemBg: ['#022c22', '#EAF3FC'],
+    sidebarActiveItemText: ['#ffffff', '#003366'],
+    headerBgColor: ['#022c22', '#FFFFFF'],
+    headerBackgroundColor: ['#022c22', '#FFFFFF'],
+    headerTextColor: ['#ffffff', '#003366'],
+    buttonPrimaryBg: ['#064e3b', '#0056A6'],
+    linkTextColor: ['#065f46', '#0056A6'],
+    footerBackgroundColor: ['#0f172a', '#003366'],
+    footerTextColor: ['#cbd5e1', '#EAF3FC'],
+    footerBorderColor: ['#1e293b', '#0056A6']
+  };
+  const mutable = updated as Record<string, unknown>;
+  for (const [key, [legacy, replacement]] of Object.entries(replacements)) {
+    if (mutable[key] === legacy) mutable[key] = replacement;
+  }
+  return updated;
+}
 
 const isValidColor = (val: any) => typeof val === 'string' && (/^#([0-9a-fA-F]{3,8})$/.test(val) || /^rgb/.test(val));
 
@@ -1887,7 +2182,11 @@ function getServerState(): PersistedServerState {
     activities: withPosition(activities),
     evaluations: withPosition(evaluations),
     auditLogs: withPosition(auditLogs),
-    evaluationForms: withPosition(evaluationForms),
+    evaluationForms: withPosition(evaluationForms.map(form => ({
+      ...form,
+      publicEnabled: form.publicEnabled !== false,
+      expiresAt: form.expiresAt || null
+    }))),
     surveys: withPosition(surveys),
     surveyResponses: withPosition(surveyResponses),
     currentTheme,
@@ -1924,12 +2223,15 @@ function restoreServerState(saved: unknown) {
   restoreArray(evaluations, state.evaluations, 'evaluations');
   restoreArray(auditLogs, state.auditLogs, 'auditLogs');
   restoreArray(evaluationForms, state.evaluationForms, 'evaluationForms');
+  evaluationForms.forEach(form => {
+    if (form.publicEnabled === undefined) form.publicEnabled = true;
+  });
   restoreArray(surveys, state.surveys, 'surveys');
   restoreArray(surveyResponses, state.surveyResponses, 'surveyResponses');
 
   if (state.systemSettings && typeof state.systemSettings === 'object') systemSettings = state.systemSettings;
-  if (state.currentTheme && typeof state.currentTheme === 'object') currentTheme = state.currentTheme;
-  if (state.websiteThemes && typeof state.websiteThemes === 'object') currentTheme = state.websiteThemes;
+  if (state.currentTheme && typeof state.currentTheme === 'object') currentTheme = migrateLegacyTheme(state.currentTheme as Record<string, unknown>);
+  if (state.websiteThemes && typeof state.websiteThemes === 'object') currentTheme = migrateLegacyTheme(state.websiteThemes as Record<string, unknown>);
 }
 
 async function supabaseStateRequest(path: string, init?: RequestInit) {
@@ -1978,6 +2280,7 @@ async function hydrateServerState() {
     body: '{}'
   });
   restoreServerState(await response.json());
+  lastSnapshotHydratedAt = Date.now();
   console.log('Loaded application data from normalized Supabase tables.');
 }
 
