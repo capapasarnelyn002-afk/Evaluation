@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
-  Building2, 
   Wifi, 
   WifiOff, 
   RefreshCw, 
@@ -11,6 +10,7 @@ import {
   Menu,
   X,
 } from 'lucide-react';
+import { UniversityLogo } from './UniversityLogo';
 
 export const Header: React.FC = () => {
   const { 
@@ -46,24 +46,7 @@ export const Header: React.FC = () => {
           
           {/* Zone 1: Single Text Element Wordmark */}
           <div className="flex items-center gap-3 shrink-0">
-            <div 
-              className="w-9 h-9 rounded-lg flex items-center justify-center shadow-xs shrink-0 overflow-hidden"
-              style={{
-                backgroundColor: theme.sidebarLogoBg || '#0056A6',
-                color: theme.sidebarLogoColor || '#FFFFFF'
-              }}
-            >
-              {theme.sidebarLogoType === 'image' && theme.sidebarLogoUrl ? (
-                <img 
-                  src={theme.sidebarLogoUrl} 
-                  alt={theme.logoText || "Logo"} 
-                  className="w-6 h-6 object-contain"
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                />
-              ) : (
-                <Building2 className="w-5 h-5" />
-              )}
-            </div>
+            <UniversityLogo alt="Southern Leyte State University" className="h-10 w-11 shrink-0" />
             <div className="flex flex-col">
               <a
                 href="#"

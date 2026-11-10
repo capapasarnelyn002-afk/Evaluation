@@ -5,13 +5,13 @@ import {
   X, 
   QrCode, 
   ShieldCheck, 
-  Building2, 
   FileCheck2,
   Copy,
   Check
 } from 'lucide-react';
 import { PARTICIPANT_CATEGORIES_DISPLAY } from '../data/seedData';
 import { useApp } from '../context/AppContext';
+import { UniversityLogo } from './UniversityLogo';
 
 interface Props {
   evaluation: EvaluationSubmission;
@@ -74,11 +74,12 @@ export const EvaluationReceiptModal: React.FC<Props> = ({ evaluation, activity, 
             
             {/* Watermark badge */}
             <div className="absolute -right-6 -bottom-6 opacity-5 pointer-events-none" aria-hidden="true">
-              <Building2 className="w-48 h-48 text-blue-950" />
+              <UniversityLogo alt="" className="h-48 w-52" />
             </div>
 
             {/* University Letterhead */}
             <div className="text-center pb-4 border-b border-slate-200">
+              <UniversityLogo alt="Southern Leyte State University" className="mx-auto mb-2 h-16 w-20" />
               <h4 className="text-xs uppercase font-extrabold tracking-widest text-blue-950">
                 Southern Leyte State University
               </h4>

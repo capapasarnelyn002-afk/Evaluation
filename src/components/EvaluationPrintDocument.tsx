@@ -1,5 +1,6 @@
 import React from 'react';
 import { Activity, EvaluationForm, EvaluationSubmission, WebsiteTheme } from '../types';
+import { UniversityLogo } from './UniversityLogo';
 
 export type EvaluationPrintMode = 'blank' | 'summary' | 'completed';
 
@@ -79,7 +80,7 @@ export const EvaluationPrintDocument: React.FC<EvaluationPrintDocumentProps> = (
   return (
     <div className="evaluation-print-document" aria-hidden="true">
       <header className="evaluation-print-header">
-        {theme.sidebarLogoUrl && <img src={theme.sidebarLogoUrl} alt="" className="evaluation-print-logo" />}
+        <UniversityLogo alt="" className="evaluation-print-logo" />
         <p className="evaluation-print-organization">{institutionName || theme.siteName}</p>
         <h1>{activityTitle}</h1>
         {printForm?.title && <h2>{printForm.title}</h2>}

@@ -9,7 +9,8 @@ import { CapstoneAboutModal } from './components/CapstoneAboutModal';
 import { LoginModal } from './components/LoginModal';
 import { PublicEvaluationView } from './components/PublicEvaluationView';
 import { ToastContainer } from './components/ui/Toast';
-import { Building2, ShieldCheck, Award, LoaderCircle } from 'lucide-react';
+import { ShieldCheck, Award, LoaderCircle } from 'lucide-react';
+import { UniversityLogo } from './components/UniversityLogo';
 
 const normalizeContentBlocks = (blocks?: any[]) => {
   if (!Array.isArray(blocks)) return [];
@@ -142,24 +143,35 @@ const MainLayout: React.FC = () => {
             }}
           >
             {footerBlocks.length > 0 ? (
-              <div className="max-w-7xl mx-auto grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
-                {footerBlocks.map((block, index) => renderManagedBlock(block, index, 'footer'))}
-              </div>
+              <>
+                {theme.footerLogoVisible !== false && (
+                  <UniversityLogo
+                    alt="Southern Leyte State University"
+                    className="mx-auto mb-4 rounded bg-white p-0.5"
+                    style={{
+                      width: theme.footerLogoSize || '48px',
+                      height: theme.footerLogoSize || '43px',
+                      border: `1px solid ${theme.secondaryColor || '#1976D2'}`
+                    }}
+                  />
+                )}
+                <div className="max-w-7xl mx-auto grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
+                  {footerBlocks.map((block, index) => renderManagedBlock(block, index, 'footer'))}
+                </div>
+              </>
             ) : (
               <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-3">
                   {theme.footerLogoVisible !== false && (
-                    <div
-                      className="rounded-lg border flex items-center justify-center text-amber-400 font-bold shrink-0"
+                    <UniversityLogo
+                      alt="Southern Leyte State University"
+                      className="shrink-0 rounded bg-white p-0.5"
                       style={{
-                        width: theme.footerLogoSize || '32px',
-                        height: theme.footerLogoSize || '32px',
-                        backgroundColor: theme.primaryColor || '#0056A6',
-                        borderColor: theme.secondaryColor || '#1976D2'
+                        width: theme.footerLogoSize || '48px',
+                        height: theme.footerLogoSize || '43px',
+                        border: `1px solid ${theme.secondaryColor || '#1976D2'}`
                       }}
-                    >
-                      <Building2 className="w-4 h-4" />
-                    </div>
+                    />
                   )}
                   <div>
                     <p className="font-semibold text-white text-xs">{theme.footerTitle || 'Institutional footer'}</p>

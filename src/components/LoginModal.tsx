@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { ArrowLeft, Building2, KeyRound, Lock } from 'lucide-react';
+import { ArrowLeft, KeyRound, Lock } from 'lucide-react';
 import { DatabaseStatusIndicator } from './DatabaseStatusIndicator';
+import { UniversityLogo } from './UniversityLogo';
 
 export const LoginModal: React.FC = () => {
   const { loginWithEmail, loginWithGoogle, loginError, clearLoginError } = useApp();
@@ -35,9 +36,7 @@ export const LoginModal: React.FC = () => {
     <main className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0056A6] text-white shadow-lg">
-            <Building2 className="h-7 w-7" />
-          </div>
+          <UniversityLogo className="mx-auto mb-4 h-24 w-24 sm:h-28 sm:w-28" />
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-800">Southern Leyte State University</p>
           <h1 className="mt-2 text-2xl font-bold text-slate-900">Extension Evaluation System</h1>
           <p className="mt-2 text-sm text-slate-600">Administrator sign-in is required to manage evaluation activities and results.</p>

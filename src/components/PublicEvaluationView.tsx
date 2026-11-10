@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { ArrowLeft, Building2, CheckCircle2, ExternalLink, LoaderCircle, Send } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ExternalLink, LoaderCircle, Send } from 'lucide-react';
 import { FormQuestion, WebsiteTheme } from '../types';
+import { UniversityLogo } from './UniversityLogo';
 
 interface PublicActivity {
   title: string;
@@ -293,14 +294,7 @@ export const PublicEvaluationView: React.FC<{ formId?: string; theme: WebsiteThe
           }}
         >
           <div className="flex min-w-0 items-center gap-3">
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl text-white"
-              style={{ backgroundColor: theme.primaryColor, color: theme.sidebarLogoColor }}
-            >
-              {theme.sidebarLogoType === 'image' && theme.sidebarLogoUrl
-                ? <img src={theme.sidebarLogoUrl} alt="" className="h-full w-full object-contain" />
-                : <Building2 className="h-6 w-6" />}
-            </div>
+            <UniversityLogo alt="Southern Leyte State University" className="h-12 w-14 shrink-0" />
             <div className="min-w-0">
               <p className="truncate text-xs font-bold uppercase tracking-wide" style={{ color: theme.primaryColor }}>
                 {theme.headerTitle || theme.siteName}
@@ -402,6 +396,7 @@ export const PublicEvaluationView: React.FC<{ formId?: string; theme: WebsiteThe
               padding: theme.footerPadding
             }}
           >
+            <UniversityLogo alt="" className="mx-auto mb-2 h-10 w-12" />
             <p className="font-semibold">{theme.footerTitle || theme.siteName}</p>
             <p>{theme.footerSubtitle || theme.siteTagline}</p>
           </footer>

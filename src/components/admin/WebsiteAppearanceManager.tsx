@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DEFAULT_THEME, useApp } from '../../context/AppContext';
 import { WebsiteTheme, TypographySettings, LogoHistoryItem, ManagedContentBlock } from '../../types';
+import { UniversityLogo } from '../UniversityLogo';
 import { 
   Palette, 
   RotateCcw, 
@@ -1981,16 +1982,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                       style={{ backgroundColor: currentSidebarLogoBg, color: currentSidebarLogoColor }}
                       title={formTheme.logoText || 'SLSU-Hinunangan'}
                     >
-                      {formTheme.sidebarLogoType === 'image' && formTheme.sidebarLogoUrl ? (
-                        <img 
-                          src={formTheme.sidebarLogoUrl} 
-                          alt="Logo" 
-                          className="w-6 h-6 object-contain"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        />
-                      ) : (
-                        renderPreviewLogoIcon(currentSidebarLogoIcon)
-                      )}
+                      <UniversityLogo alt="Southern Leyte State University" className="h-full w-full bg-white object-contain" />
                     </div>
                   ) : (
                     <div className="flex items-center gap-3 overflow-hidden min-w-0">
@@ -1998,16 +1990,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
                         className={`w-9 h-9 ${shapeClass} flex items-center justify-center font-bold shrink-0 shadow-xs transition-colors overflow-hidden`}
                         style={{ backgroundColor: currentSidebarLogoBg, color: currentSidebarLogoColor }}
                       >
-                        {formTheme.sidebarLogoType === 'image' && formTheme.sidebarLogoUrl ? (
-                          <img 
-                            src={formTheme.sidebarLogoUrl} 
-                            alt="Logo" 
-                            className="w-5.5 h-5.5 object-contain"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          />
-                        ) : (
-                          renderPreviewLogoIcon(currentSidebarLogoIcon)
-                        )}
+                        <UniversityLogo alt="Southern Leyte State University" className="h-full w-full bg-white object-contain" />
                       </div>
                       <div className="flex flex-col truncate min-w-0">
                         <span 

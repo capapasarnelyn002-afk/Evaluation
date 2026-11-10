@@ -2,7 +2,6 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
 import { 
-  Building2, 
   BarChart3, 
   Users, 
   FileSpreadsheet, 
@@ -23,10 +22,8 @@ import {
   Palette,
   FileEdit,
   ClipboardList,
-  GraduationCap,
-  Landmark,
-  BookOpen
 } from 'lucide-react';
+import { UniversityLogo } from './UniversityLogo';
 
 export const Sidebar: React.FC = () => {
   const { 
@@ -79,60 +76,10 @@ export const Sidebar: React.FC = () => {
       : 'bg-slate-100 text-slate-700 border-slate-300';
   };
 
-  const renderLogoIcon = (iconName?: string) => {
-    switch (iconName) {
-      case 'graduation':
-        return <GraduationCap className="w-5 h-5 shrink-0" />;
-      case 'award':
-        return <Award className="w-5 h-5 shrink-0" />;
-      case 'shield':
-        return <ShieldCheck className="w-5 h-5 shrink-0" />;
-      case 'landmark':
-        return <Landmark className="w-5 h-5 shrink-0" />;
-      case 'book':
-        return <BookOpen className="w-5 h-5 shrink-0" />;
-      case 'sparkles':
-        return <Sparkles className="w-5 h-5 shrink-0" />;
-      case 'building':
-      default:
-        return <Building2 className="w-5 h-5 shrink-0" />;
-    }
-  };
-
-  const getLogoShapeClass = (shape?: string) => {
-    switch (shape) {
-      case 'circle':
-        return 'rounded-full';
-      case 'square':
-        return 'rounded-xs';
-      case 'rounded':
-      default:
-        return 'rounded-xl';
-    }
-  };
-
-  const logoBg = theme.sidebarLogoBg || theme.primaryColor;
-  const logoColor = theme.sidebarLogoColor || theme.accentColor;
   const logoTextColor = theme.sidebarLogoTextColor || theme.sidebarTextColor || '#1e293b';
   const sidebarBorder = theme.sidebarBorderColor || '#e2e8f0';
   const activeItemBg = theme.sidebarActiveItemBg || theme.primaryColor;
   const activeItemText = theme.sidebarActiveItemText || '#ffffff';
-
-  const renderLogoContent = (collapsed = false) => {
-    if (theme.sidebarLogoType === 'image' && theme.sidebarLogoUrl) {
-      return (
-        <img
-          src={theme.sidebarLogoUrl}
-          alt={theme.logoText || 'University Logo'}
-          className={`${collapsed ? 'w-6 h-6' : 'w-5.5 h-5.5'} object-contain shrink-0`}
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-          }}
-        />
-      );
-    }
-    return renderLogoIcon(theme.sidebarLogoIcon);
-  };
 
   const sidebarContent = (
     <div 
@@ -146,11 +93,10 @@ export const Sidebar: React.FC = () => {
             <div className="relative flex items-center justify-center">
               <button
                 onClick={() => setSidebarCollapsed(false)}
-                className={`w-10 h-10 ${getLogoShapeClass(theme.sidebarLogoShape)} flex items-center justify-center font-bold shadow-xs transition-transform hover:scale-105 cursor-pointer relative group overflow-hidden`}
-                style={{ backgroundColor: logoBg, color: logoColor }}
+                className="relative group flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden bg-white transition-transform hover:scale-105"
                 title="Click to expand sidebar"
               >
-                {renderLogoContent(true)}
+                <UniversityLogo alt="Southern Leyte State University" className="h-full w-full" />
                 <div className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-600 shadow-xs group-hover:bg-slate-100 transition-colors">
                   <ChevronRight className="w-3 h-3" />
                 </div>
@@ -160,10 +106,9 @@ export const Sidebar: React.FC = () => {
             <>
               <div className="flex items-center gap-3 overflow-hidden min-w-0">
                 <div 
-                  className={`w-9 h-9 ${getLogoShapeClass(theme.sidebarLogoShape)} flex items-center justify-center font-bold shrink-0 shadow-xs transition-colors overflow-hidden`}
-                  style={{ backgroundColor: logoBg, color: logoColor }}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden bg-white"
                 >
-                  {renderLogoContent(false)}
+                  <UniversityLogo alt="Southern Leyte State University" className="h-full w-full" />
                 </div>
                 <div className="flex flex-col truncate min-w-0">
                   <span 
@@ -246,7 +191,7 @@ export const Sidebar: React.FC = () => {
                 }}
                 title={sidebarCollapsed ? item.label : undefined}
               >
-                <div style={isActive ? { color: logoColor } : {}}>
+                <div style={isActive ? { color: activeItemText } : {}}>
                   {item.icon}
                 </div>
                 {!sidebarCollapsed && (
