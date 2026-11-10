@@ -126,14 +126,19 @@ create table if not exists public.survey_responses (
 create table if not exists public.system_settings (
   id text primary key check (id = 'default'),
   data jsonb not null,
-  "updatedAt" timestamptz not null default now()
+  "updatedAt" timestamptz not null default now(),
+  version bigint not null default 1
 );
 
 create table if not exists public.website_themes (
   id text primary key check (id = 'default'),
   data jsonb not null,
-  "updatedAt" timestamptz not null default now()
+  "updatedAt" timestamptz not null default now(),
+  version bigint not null default 1
 );
+
+alter table public.system_settings add column if not exists version bigint not null default 1;
+alter table public.website_themes add column if not exists version bigint not null default 1;
 
 create table if not exists public.public_evaluation_submission_limits (
   rate_limit_key text primary key,
@@ -208,18 +213,40 @@ $$;
 revoke all on function public.reserve_public_evaluation_submission(text, integer, integer) from public, anon, authenticated;
 grant execute on function public.reserve_public_evaluation_submission(text, integer, integer) to service_role;
 
--- Isolate theme writes so unrelated snapshot rows cannot block appearance saves.
-create or replace function public.save_website_theme(p_theme jsonb, p_audit_log jsonb)
-returns void
+-- Versioned configuration writes prevent another device from overwriting newer edits.
+drop function if exists public.save_website_theme(jsonb, jsonb);
+create or replace function public.save_website_theme(
+  p_theme jsonb,
+  p_audit_log jsonb,
+  p_expected_version bigint
+)
+returns jsonb
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  current_version bigint;
+  saved_row public.website_themes%rowtype;
 begin
-  insert into public.website_themes (id, data, "updatedAt")
-  values ('default', p_theme, now())
+  perform pg_advisory_xact_lock(730001);
+  select version into current_version
+  from public.website_themes
+  where id = 'default'
+  for update;
+
+  current_version := coalesce(current_version, 0);
+  if current_version <> p_expected_version then
+    raise exception using errcode = '40001', message = 'CONFIGURATION_VERSION_CONFLICT';
+  end if;
+
+  insert into public.website_themes (id, data, "updatedAt", version)
+  values ('default', p_theme, now(), current_version + 1)
   on conflict (id) do update
-    set data = excluded.data, "updatedAt" = excluded."updatedAt";
+    set data = excluded.data,
+        "updatedAt" = excluded."updatedAt",
+        version = excluded.version
+  returning * into saved_row;
 
   insert into public.audit_logs (
     id, timestamp, "adminName", action, "resourceId", reason, __position
@@ -234,11 +261,96 @@ begin
     (select coalesce(min(__position), 0) - 1 from public.audit_logs)
   )
   on conflict (id) do nothing;
+
+  return jsonb_build_object(
+    'data', saved_row.data,
+    'version', saved_row.version,
+    'updatedAt', saved_row."updatedAt"
+  );
 end;
 $$;
 
-revoke all on function public.save_website_theme(jsonb, jsonb) from public, anon, authenticated;
-grant execute on function public.save_website_theme(jsonb, jsonb) to service_role;
+revoke all on function public.save_website_theme(jsonb, jsonb, bigint) from public, anon, authenticated;
+grant execute on function public.save_website_theme(jsonb, jsonb, bigint) to service_role;
+
+create or replace function public.save_system_settings(
+  p_settings jsonb,
+  p_audit_log jsonb,
+  p_expected_version bigint
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  current_version bigint;
+  saved_row public.system_settings%rowtype;
+begin
+  perform pg_advisory_xact_lock(730002);
+  select version into current_version
+  from public.system_settings
+  where id = 'default'
+  for update;
+
+  current_version := coalesce(current_version, 0);
+  if current_version <> p_expected_version then
+    raise exception using errcode = '40001', message = 'CONFIGURATION_VERSION_CONFLICT';
+  end if;
+
+  insert into public.system_settings (id, data, "updatedAt", version)
+  values ('default', p_settings, now(), current_version + 1)
+  on conflict (id) do update
+    set data = excluded.data,
+        "updatedAt" = excluded."updatedAt",
+        version = excluded.version
+  returning * into saved_row;
+
+  insert into public.audit_logs (
+    id, timestamp, "adminName", action, "resourceId", reason, __position
+  )
+  values (
+    p_audit_log->>'id',
+    (p_audit_log->>'timestamp')::timestamptz,
+    p_audit_log->>'adminName',
+    p_audit_log->>'action',
+    p_audit_log->>'resourceId',
+    p_audit_log->>'reason',
+    (select coalesce(min(__position), 0) - 1 from public.audit_logs)
+  )
+  on conflict (id) do nothing;
+
+  return jsonb_build_object(
+    'data', saved_row.data,
+    'version', saved_row.version,
+    'updatedAt', saved_row."updatedAt"
+  );
+end;
+$$;
+
+revoke all on function public.save_system_settings(jsonb, jsonb, bigint) from public, anon, authenticated;
+grant execute on function public.save_system_settings(jsonb, jsonb, bigint) to service_role;
+
+create or replace function public.load_application_configuration()
+returns jsonb
+language sql
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'theme', (
+      select jsonb_build_object('data', data, 'version', version, 'updatedAt', "updatedAt")
+      from public.website_themes where id = 'default'
+    ),
+    'systemSettings', (
+      select jsonb_build_object('data', data, 'version', version, 'updatedAt', "updatedAt")
+      from public.system_settings where id = 'default'
+    )
+  );
+$$;
+
+revoke all on function public.load_application_configuration() from public, anon, authenticated;
+grant execute on function public.load_application_configuration() to service_role;
 
 create or replace function public.create_application_profile()
 returns trigger
@@ -336,22 +448,7 @@ begin
     coalesce(p_snapshot->'surveyResponses', '[]'::jsonb)
   ) as r;
 
-  insert into public.system_settings (id, data, "updatedAt")
-  values ('default', coalesce(p_snapshot->'systemSettings', '{}'::jsonb), now())
-  on conflict (id) do update set data = excluded.data, "updatedAt" = excluded."updatedAt";
-
-  insert into public.website_themes (id, data, "updatedAt")
-  values (
-    'default',
-    coalesce(
-      p_snapshot->'currentTheme',
-      p_snapshot->'websiteThemes',
-      p_snapshot->'theme',
-      '{}'::jsonb
-    ),
-    now()
-  )
-  on conflict (id) do update set data = excluded.data, "updatedAt" = excluded."updatedAt";
+  -- Configuration has its own versioned save RPCs; snapshots must never overwrite it.
 end;
 $$;
 
@@ -372,7 +469,9 @@ as $$
     'systemSettings', (select data from public.system_settings where id = 'default'),
     'currentTheme', coalesce((select data from public.website_themes where id = 'default'), '{}'::jsonb),
     'websiteThemes', coalesce((select data from public.website_themes where id = 'default'), '{}'::jsonb),
-    'themePersistenceReady', to_regprocedure('public.save_website_theme(jsonb,jsonb)') is not null
+    'themePersistenceReady',
+      to_regprocedure('public.save_website_theme(jsonb,jsonb,bigint)') is not null
+      and to_regprocedure('public.save_system_settings(jsonb,jsonb,bigint)') is not null
   );
 $$;
 

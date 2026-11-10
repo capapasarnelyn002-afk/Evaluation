@@ -27,6 +27,7 @@ app.use((req, res, next) => {
     !req.path.startsWith('/api/auth/') &&
     req.path !== '/api/theme' &&
     req.path !== '/api/theme/reset' &&
+    req.path !== '/api/settings' &&
     ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
 
   if (isStateMutation) {
@@ -58,12 +59,18 @@ app.use((req, res, next) => {
 });
 
 app.use('/api', async (req, res, next) => {
-  if (req.method === 'GET') res.setHeader('Cache-Control', 'no-store');
+  const isConfigurationRoute = ['/theme', '/theme/reset', '/settings', '/public/config'].includes(req.path);
+  if (req.method === 'GET' || isConfigurationRoute) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Vary', 'Authorization');
+  }
   if (['/health', '/database/status', '/auth/logout'].includes(req.path)) return next();
 
   try {
     await persistenceQueue;
-    if (Date.now() - lastSnapshotHydratedAt > 1000) {
+    if (!isConfigurationRoute && Date.now() - lastSnapshotHydratedAt > 1000) {
       snapshotRefreshPromise ||= hydrateServerState().finally(() => { snapshotRefreshPromise = undefined; });
       await snapshotRefreshPromise;
     }
@@ -211,7 +218,7 @@ app.use('/api', async (req, res, next) => {
   if (
     isPublicFormRead ||
     isPublicSubmission ||
-    ['/auth/login', '/auth/me', '/auth/logout', '/database/status', '/health'].includes(req.path)
+    ['/public/config', '/auth/login', '/auth/me', '/auth/logout', '/database/status', '/health'].includes(req.path)
   ) return next();
 
   const accessToken = req.headers.authorization?.replace(/^Bearer\s+/i, '');
@@ -1136,21 +1143,58 @@ app.get('/api/participant/evaluations', (req, res) => {
 // ==========================================
 // SYSTEM SETTINGS & BENCHMARKS ENDPOINTS
 // ==========================================
-app.get('/api/settings', (_req, res) => {
-  res.json(systemSettings);
+app.get('/api/settings', async (_req, res) => {
+  try {
+    const configuration = await loadApplicationConfiguration();
+    systemSettings = configuration.systemSettings;
+    setConfigurationHeaders(res, configuration.systemSettingsVersion, configuration.systemSettingsUpdatedAt);
+    return res.json(systemSettings);
+  } catch (error) {
+    console.error('Failed to load institutional settings:', error);
+    return res.status(503).json({ error: 'Institutional settings are temporarily unavailable.' });
+  }
 });
 
-app.patch('/api/settings', (req, res) => {
-  systemSettings = { ...systemSettings, ...req.body };
-  auditLogs.unshift({
-    id: `log-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    adminName: 'Super Admin',
-    action: 'SYSTEM_SETTINGS_UPDATED',
-    resourceId: 'system_settings',
-    reason: 'Updated institutional accreditation benchmarks and sync configuration.'
-  });
-  res.json(systemSettings);
+app.patch('/api/settings', async (req, res) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'A valid settings configuration is required.' });
+  }
+  const stringSettings = ['institutionName', 'campusCode', 'leadDepartment', 'accreditationCycle', 'academicYear'];
+  const numericSettings = ['minimumTurnoutTargetPct', 'targetSatisfactionMean'];
+  const booleanSettings = ['autoSyncOnReconnect', 'enableDataPrivacyMasking'];
+  const allowedSettings = new Set([...stringSettings, ...numericSettings, ...booleanSettings]);
+  for (const [key, value] of Object.entries(req.body)) {
+    if (!allowedSettings.has(key)) return res.status(400).json({ error: `Unknown system setting: ${key}.` });
+    if (stringSettings.includes(key) && typeof value !== 'string') return res.status(400).json({ error: `${key} must be text.` });
+    if (numericSettings.includes(key) && (typeof value !== 'number' || !Number.isFinite(value))) return res.status(400).json({ error: `${key} must be a finite number.` });
+    if (booleanSettings.includes(key) && typeof value !== 'boolean') return res.status(400).json({ error: `${key} must be true or false.` });
+  }
+  const expectedVersion = parseExpectedConfigurationVersion(req, res);
+  if (expectedVersion === null) return;
+
+  try {
+    const configuration = await loadApplicationConfiguration();
+    const nextSettings = { ...configuration.systemSettings, ...req.body };
+    const auditLog = {
+      id: `log-${randomUUID()}`,
+      timestamp: new Date().toISOString(),
+      adminName: 'Administrator',
+      action: 'SYSTEM_SETTINGS_UPDATED',
+      resourceId: 'system_settings',
+      reason: 'Updated institutional accreditation benchmarks and sync configuration.'
+    };
+    const saved = await saveSystemSettings(nextSettings, auditLog, expectedVersion);
+    systemSettings = saved.data;
+    auditLogs.unshift(auditLog);
+    setConfigurationHeaders(res, saved.version, saved.updatedAt);
+    return res.json(systemSettings);
+  } catch (error) {
+    console.error('Failed to save institutional settings:', error);
+    if (isConfigurationVersionConflict(error)) {
+      return res.status(409).json({ error: 'Settings changed on another device. Reload the latest settings before saving again.' });
+    }
+    return res.status(503).json({ error: 'Institutional settings could not be saved to the database.' });
+  }
 });
 
 // ==========================================
@@ -1907,77 +1951,128 @@ function migrateLegacyTheme(theme: Record<string, unknown>) {
   return updated;
 }
 
-const isValidColor = (val: any) => typeof val === 'string' && (/^#([0-9a-fA-F]{3,8})$/.test(val) || /^rgb/.test(val));
+const isValidColor = (val: unknown) =>
+  typeof val === 'string' &&
+  (/^#(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})$/i.test(val) ||
+    /^rgba?\(\s*[\d.%\s,]+\)$/i.test(val));
 
-app.get('/api/theme', (_req, res) => {
-  res.json(currentTheme);
+app.get('/api/public/config', async (_req, res) => {
+  try {
+    const configuration = await loadApplicationConfiguration();
+    return res.json({
+      theme: configuration.theme,
+      version: configuration.themeVersion,
+      updatedAt: configuration.themeUpdatedAt
+    });
+  } catch (error) {
+    console.error('Failed to load public website configuration:', error);
+    return res.status(503).json({ error: 'The latest website configuration is temporarily unavailable.' });
+  }
+});
+
+app.get('/api/theme', async (_req, res) => {
+  try {
+    const configuration = await loadApplicationConfiguration();
+    currentTheme = configuration.theme;
+    setConfigurationHeaders(res, configuration.themeVersion, configuration.themeUpdatedAt);
+    return res.json(currentTheme);
+  } catch (error) {
+    console.error('Failed to load website appearance:', error);
+    return res.status(503).json({ error: 'The latest website appearance is temporarily unavailable.' });
+  }
 });
 
 app.post('/api/theme', async (req, res) => {
   if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
     return res.status(400).json({ error: 'A valid appearance configuration is required.' });
   }
-
-  // Validate typography bounds and font colors if provided
-  if (req.body.typography) {
-    const typo = req.body.typography;
-    const validatedTypo = {
-      baseFontSize: Math.max(0.75, Math.min(1.35, Number(typo.baseFontSize) || 1.0)),
-      pageTitleSize: Math.max(1.15, Math.min(2.5, Number(typo.pageTitleSize) || 1.5)),
-      sectionHeadingSize: Math.max(0.9, Math.min(1.8, Number(typo.sectionHeadingSize) || 1.125)),
-      bodyTextSize: Math.max(0.75, Math.min(1.25, Number(typo.bodyTextSize) || 0.875)),
-      labelSize: Math.max(0.65, Math.min(1.0, Number(typo.labelSize) || 0.75)),
-      buttonTextSize: Math.max(0.65, Math.min(1.1, Number(typo.buttonTextSize) || 0.75)),
-      tableTextSize: Math.max(0.65, Math.min(1.0, Number(typo.tableTextSize) || 0.75)),
-      navTextSize: Math.max(0.75, Math.min(1.25, Number(typo.navTextSize) || 0.875)),
-      metricNumberSize: Math.max(1.4, Math.min(2.6, Number(typo.metricNumberSize) || 1.875)),
-      smallTextSize: Math.max(0.6, Math.min(0.9, Number(typo.smallTextSize) || 0.6875)),
-      pageTitleColor: isValidColor(typo.pageTitleColor) ? typo.pageTitleColor : (currentTheme.typography?.pageTitleColor || '#0f172a'),
-      sectionHeadingColor: isValidColor(typo.sectionHeadingColor) ? typo.sectionHeadingColor : (currentTheme.typography?.sectionHeadingColor || '#1e293b'),
-      bodyTextColor: isValidColor(typo.bodyTextColor) ? typo.bodyTextColor : (currentTheme.typography?.bodyTextColor || '#334155'),
-      mutedTextColor: isValidColor(typo.mutedTextColor) ? typo.mutedTextColor : (currentTheme.typography?.mutedTextColor || '#64748b'),
-      labelTextColor: isValidColor(typo.labelTextColor) ? typo.labelTextColor : (currentTheme.typography?.labelTextColor || '#475569')
-    };
-    req.body.typography = validatedTypo;
+  const expectedVersion = parseExpectedConfigurationVersion(req, res);
+  if (expectedVersion === null) return;
+  if (
+    req.body.typography !== undefined &&
+    (!req.body.typography || typeof req.body.typography !== 'object' || Array.isArray(req.body.typography))
+  ) {
+    return res.status(400).json({ error: 'Typography settings must be a configuration object.' });
+  }
+  const colorFields = [
+    'primaryColor', 'secondaryColor', 'accentColor', 'pageBgColor', 'cardBgColor',
+    'sidebarBgColor', 'sidebarTextColor', 'sidebarLogoColor', 'sidebarLogoBg',
+    'sidebarLogoTextColor', 'sidebarActiveItemBg', 'sidebarActiveItemText',
+    'sidebarBorderColor', 'headerBackgroundColor', 'headerBgColor', 'headerTextColor',
+    'headerBorderColor', 'footerBackgroundColor', 'footerTextColor', 'footerBorderColor',
+    'buttonPrimaryBg', 'buttonPrimaryText', 'linkTextColor', 'fontColorTitle',
+    'fontColorHeading', 'fontColorBody', 'fontColorMuted', 'fontColorLabel',
+    'successColor', 'warningColor', 'errorColor'
+  ];
+  for (const key of colorFields) {
+    if (req.body[key] !== undefined && !isValidColor(req.body[key])) {
+      return res.status(400).json({ error: `The ${key} value must be a valid color.` });
+    }
   }
 
-  // Validate root font color fields if provided
-  if (req.body.fontColorTitle && !isValidColor(req.body.fontColorTitle)) delete req.body.fontColorTitle;
-  if (req.body.fontColorHeading && !isValidColor(req.body.fontColorHeading)) delete req.body.fontColorHeading;
-  if (req.body.fontColorBody && !isValidColor(req.body.fontColorBody)) delete req.body.fontColorBody;
-  if (req.body.fontColorMuted && !isValidColor(req.body.fontColorMuted)) delete req.body.fontColorMuted;
-  if (req.body.fontColorLabel && !isValidColor(req.body.fontColorLabel)) delete req.body.fontColorLabel;
-
-  const nextTheme = {
-    ...currentTheme, 
-    ...req.body,
-    typography: req.body.typography || currentTheme.typography 
-  };
-
-  const auditLog = {
-    id: `log-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    adminName: 'Administrator',
-    action: req.body.typography ? 'TYPOGRAPHY_AND_THEME_SAVED' : 'THEME_CUSTOMIZATION_SAVED',
-    resourceId: 'website_theme',
-    reason: `Applied customized brand typography & theme settings (Base: ${nextTheme.typography?.baseFontSize || 1}rem)`
-  };
-
   try {
-    await saveWebsiteTheme(nextTheme, auditLog);
-    currentTheme = nextTheme;
+    const configuration = await loadApplicationConfiguration();
+    currentTheme = configuration.theme;
+    const requestTheme = { ...req.body };
+    if (requestTheme.typography) {
+      const typo = requestTheme.typography;
+      requestTheme.typography = {
+        baseFontSize: Math.max(0.75, Math.min(1.35, Number(typo.baseFontSize) || 1.0)),
+        pageTitleSize: Math.max(1.15, Math.min(2.5, Number(typo.pageTitleSize) || 1.5)),
+        sectionHeadingSize: Math.max(0.9, Math.min(1.8, Number(typo.sectionHeadingSize) || 1.125)),
+        bodyTextSize: Math.max(0.75, Math.min(1.25, Number(typo.bodyTextSize) || 0.875)),
+        labelSize: Math.max(0.65, Math.min(1.0, Number(typo.labelSize) || 0.75)),
+        buttonTextSize: Math.max(0.65, Math.min(1.1, Number(typo.buttonTextSize) || 0.75)),
+        tableTextSize: Math.max(0.65, Math.min(1.0, Number(typo.tableTextSize) || 0.75)),
+        navTextSize: Math.max(0.75, Math.min(1.25, Number(typo.navTextSize) || 0.875)),
+        metricNumberSize: Math.max(1.4, Math.min(2.6, Number(typo.metricNumberSize) || 1.875)),
+        smallTextSize: Math.max(0.6, Math.min(0.9, Number(typo.smallTextSize) || 0.6875)),
+        pageTitleColor: isValidColor(typo.pageTitleColor) ? typo.pageTitleColor : (currentTheme.typography?.pageTitleColor || '#0f172a'),
+        sectionHeadingColor: isValidColor(typo.sectionHeadingColor) ? typo.sectionHeadingColor : (currentTheme.typography?.sectionHeadingColor || '#1e293b'),
+        bodyTextColor: isValidColor(typo.bodyTextColor) ? typo.bodyTextColor : (currentTheme.typography?.bodyTextColor || '#334155'),
+        mutedTextColor: isValidColor(typo.mutedTextColor) ? typo.mutedTextColor : (currentTheme.typography?.mutedTextColor || '#64748b'),
+        labelTextColor: isValidColor(typo.labelTextColor) ? typo.labelTextColor : (currentTheme.typography?.labelTextColor || '#475569')
+      };
+    }
+
+    for (const key of ['fontColorTitle', 'fontColorHeading', 'fontColorBody', 'fontColorMuted', 'fontColorLabel']) {
+      if (requestTheme[key] && !isValidColor(requestTheme[key])) delete requestTheme[key];
+    }
+
+    const nextTheme = {
+      ...currentTheme,
+      ...requestTheme,
+      typography: requestTheme.typography || currentTheme.typography
+    };
+    const auditLog = {
+      id: `log-${randomUUID()}`,
+      timestamp: new Date().toISOString(),
+      adminName: 'Administrator',
+      action: requestTheme.typography ? 'TYPOGRAPHY_AND_THEME_SAVED' : 'THEME_CUSTOMIZATION_SAVED',
+      resourceId: 'website_theme',
+      reason: `Applied customized brand typography & theme settings (Base: ${nextTheme.typography?.baseFontSize || 1}rem)`
+    };
+
+    const saved = await saveWebsiteTheme(nextTheme, auditLog, expectedVersion);
+    currentTheme = migrateLegacyTheme(saved.data);
     auditLogs.unshift(auditLog);
+    setConfigurationHeaders(res, saved.version, saved.updatedAt);
     return res.json(currentTheme);
   } catch (error) {
     console.error('Failed to save website appearance:', error);
+    if (isConfigurationVersionConflict(error)) {
+      return res.status(409).json({ error: 'Appearance settings changed on another device. Reload the latest settings before saving again.' });
+    }
     return res.status(503).json({ error: 'Appearance settings could not be saved to the database.' });
   }
 });
 
-app.post('/api/theme/reset', async (_req, res) => {
+app.post('/api/theme/reset', async (req, res) => {
+  const expectedVersion = parseExpectedConfigurationVersion(req, res);
+  if (expectedVersion === null) return;
   const nextTheme = structuredClone(DEFAULT_THEME);
   const auditLog = {
-    id: `log-${Date.now()}`,
+    id: `log-${randomUUID()}`,
     timestamp: new Date().toISOString(),
     adminName: 'Administrator',
     action: 'THEME_RESET_DEFAULT',
@@ -1986,12 +2081,16 @@ app.post('/api/theme/reset', async (_req, res) => {
   };
 
   try {
-    await saveWebsiteTheme(nextTheme, auditLog);
-    currentTheme = nextTheme;
+    const saved = await saveWebsiteTheme(nextTheme, auditLog, expectedVersion);
+    currentTheme = migrateLegacyTheme(saved.data);
     auditLogs.unshift(auditLog);
+    setConfigurationHeaders(res, saved.version, saved.updatedAt);
     return res.json(currentTheme);
   } catch (error) {
     console.error('Failed to reset website appearance:', error);
+    if (isConfigurationVersionConflict(error)) {
+      return res.status(409).json({ error: 'Appearance settings changed on another device. Reload the latest settings before resetting.' });
+    }
     return res.status(503).json({ error: 'Default appearance settings could not be saved to the database.' });
   }
 });
@@ -2255,12 +2354,135 @@ async function supabaseStateRequest(path: string, init?: RequestInit) {
   return response;
 }
 
-async function saveWebsiteTheme(theme: typeof currentTheme, auditLog: AuditLog) {
-  await supabaseStateRequest('rpc/save_website_theme', {
+type SavedConfiguration<T> = {
+  data: T;
+  version: number;
+  updatedAt: string;
+};
+
+async function loadApplicationConfiguration() {
+  const response = await supabaseStateRequest('rpc/load_application_configuration', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_theme: theme, p_audit_log: auditLog })
+    body: '{}'
   });
+  const result = await response.json() as {
+    theme?: SavedConfiguration<Record<string, unknown>> | null;
+    systemSettings?: SavedConfiguration<typeof systemSettings> | null;
+  } | null;
+  if (!result || typeof result !== 'object') {
+    throw new Error('Supabase returned an invalid configuration document.');
+  }
+
+  if (!result.theme) {
+    const auditLog = {
+      id: `log-${randomUUID()}`,
+      timestamp: new Date().toISOString(),
+      adminName: 'System',
+      action: 'INITIAL_THEME_CONFIGURATION',
+      resourceId: 'website_theme',
+      reason: 'Initialized the theme row because no saved theme configuration existed.'
+    };
+    try {
+      await saveWebsiteTheme(currentTheme, auditLog, 0);
+    } catch (error) {
+      if (!isConfigurationVersionConflict(error)) throw error;
+    }
+  }
+  if (!result.systemSettings) {
+    const auditLog = {
+      id: `log-${randomUUID()}`,
+      timestamp: new Date().toISOString(),
+      adminName: 'System',
+      action: 'INITIAL_SYSTEM_SETTINGS',
+      resourceId: 'system_settings',
+      reason: 'Initialized settings because no saved system configuration existed.'
+    };
+    try {
+      await saveSystemSettings(systemSettings, auditLog, 0);
+    } catch (error) {
+      if (!isConfigurationVersionConflict(error)) throw error;
+    }
+  }
+  if (!result.theme || !result.systemSettings) return loadApplicationConfiguration();
+
+  if (
+    !result.theme.data ||
+    typeof result.theme.data !== 'object' ||
+    Array.isArray(result.theme.data) ||
+    !result.systemSettings.data ||
+    typeof result.systemSettings.data !== 'object' ||
+    Array.isArray(result.systemSettings.data) ||
+    !Number.isSafeInteger(result.theme.version) ||
+    !Number.isSafeInteger(result.systemSettings.version) ||
+    typeof result.theme.updatedAt !== 'string' ||
+    typeof result.systemSettings.updatedAt !== 'string'
+  ) {
+    throw new Error('Supabase returned an invalid or incomplete saved configuration.');
+  }
+
+  return {
+    theme: migrateLegacyTheme(result.theme.data),
+    themeVersion: result.theme.version,
+    themeUpdatedAt: result.theme.updatedAt,
+    systemSettings: result.systemSettings.data,
+    systemSettingsVersion: result.systemSettings.version,
+    systemSettingsUpdatedAt: result.systemSettings.updatedAt
+  };
+}
+
+function setConfigurationHeaders(res: express.Response, version: number, updatedAt: string) {
+  res.setHeader('ETag', `"${version}"`);
+  res.setHeader('X-Configuration-Version', String(version));
+  res.setHeader('X-Configuration-Updated-At', updatedAt);
+}
+
+function parseExpectedConfigurationVersion(req: express.Request, res: express.Response) {
+  const value = req.get('If-Match');
+  const version = value ? Number(value.replace(/^"|"$/g, '')) : Number.NaN;
+  if (!Number.isSafeInteger(version) || version < 0) {
+    res.status(428).json({ error: 'The current configuration version is required. Reload the latest settings before saving.' });
+    return null;
+  }
+  return version;
+}
+
+function isConfigurationVersionConflict(error: unknown) {
+  return error instanceof Error && error.message.includes('CONFIGURATION_VERSION_CONFLICT');
+}
+
+async function saveWebsiteTheme(
+  theme: typeof currentTheme,
+  auditLog: AuditLog,
+  expectedVersion: number
+): Promise<SavedConfiguration<Record<string, unknown>>> {
+  const response = await supabaseStateRequest('rpc/save_website_theme', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      p_theme: theme,
+      p_audit_log: auditLog,
+      p_expected_version: expectedVersion
+    })
+  });
+  return response.json();
+}
+
+async function saveSystemSettings(
+  settings: typeof systemSettings,
+  auditLog: AuditLog,
+  expectedVersion: number
+): Promise<SavedConfiguration<typeof systemSettings>> {
+  const response = await supabaseStateRequest('rpc/save_system_settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      p_settings: settings,
+      p_audit_log: auditLog,
+      p_expected_version: expectedVersion
+    })
+  });
+  return response.json();
 }
 
 async function saveServerState() {
@@ -2280,6 +2502,9 @@ async function hydrateServerState() {
     body: '{}'
   });
   restoreServerState(await response.json());
+  const configuration = await loadApplicationConfiguration();
+  currentTheme = configuration.theme;
+  systemSettings = configuration.systemSettings;
   lastSnapshotHydratedAt = Date.now();
   console.log('Loaded application data from normalized Supabase tables.');
 }

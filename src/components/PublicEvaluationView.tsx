@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { ArrowLeft, Building2, CheckCircle2, ExternalLink, LoaderCircle, Send } from 'lucide-react';
-import { FormQuestion } from '../types';
+import { FormQuestion, WebsiteTheme } from '../types';
 
 interface PublicActivity {
   title: string;
@@ -58,7 +58,7 @@ const RatingChoices: React.FC<{
         const label = labels?.[index] || String(score);
         const selected = String(value ?? '') === String(score);
         return (
-          <label key={score} className={`min-h-11 cursor-pointer rounded-lg border px-3 py-2 text-sm transition-colors ${selected ? 'border-[#0056A6] bg-[#EAF3FC] text-[#003366]' : 'border-[#D9E4F0] bg-white text-slate-700 hover:bg-slate-50'}`}>
+          <label key={score} className={`min-h-11 cursor-pointer rounded-lg border px-3 py-2 text-sm transition-colors ${selected ? 'border-[var(--brand-primary)] bg-[var(--sidebar-active-bg)] text-[var(--brand-accent)]' : 'border-[var(--sidebar-border)] bg-white text-slate-700 hover:bg-slate-50'}`}>
             <input className="sr-only" type="radio" name={name} value={score} required={question.required} checked={selected} onChange={() => onChange(score)} />
             <span className="font-semibold">{label}</span>
           </label>
@@ -78,13 +78,13 @@ const QuestionField: React.FC<{
   const rows = question.criteria || [];
   const name = `question-${question.id}`;
   if (question.type === 'instructions' || question.type === 'section_title') {
-    return <p className="rounded-lg bg-[#EAF3FC] p-3 text-sm text-slate-700">{question.description || question.label}</p>;
+    return <p className="rounded-lg bg-[var(--sidebar-active-bg)] p-3 text-sm text-slate-700">{question.description || question.label}</p>;
   }
 
   const choiceOptions = question.type === 'yes_no' ? ['Yes', 'No'] : options;
   return (
     <fieldset className="space-y-3">
-      <legend className="font-semibold text-[#003366]">
+      <legend className="font-semibold text-[var(--brand-accent)]">
         {number}. {question.label}{question.required && <span className="text-rose-600"> *</span>}
       </legend>
       {question.description && <p className="text-sm text-slate-600">{question.description}</p>}
@@ -96,7 +96,7 @@ const QuestionField: React.FC<{
       {['single_choice', 'yes_no'].includes(question.type) && (
         <div className="grid gap-2 sm:grid-cols-2">
           {choiceOptions.map(option => (
-            <label key={option} className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm ${value === option ? 'border-[#0056A6] bg-[#EAF3FC]' : 'border-[#D9E4F0]'}`}>
+            <label key={option} className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm ${value === option ? 'border-[var(--brand-primary)] bg-[var(--sidebar-active-bg)]' : 'border-[var(--sidebar-border)]'}`}>
               <input type="radio" name={name} value={option} required={question.required} checked={value === option} onChange={() => onChange(option)} />
               <span>{option}</span>
             </label>
@@ -105,7 +105,7 @@ const QuestionField: React.FC<{
       )}
 
       {question.type === 'dropdown' && (
-        <select className="w-full rounded-lg border border-[#D9E4F0] bg-white px-3 py-3 text-sm" required={question.required} value={String(value ?? '')} onChange={event => onChange(event.target.value)}>
+        <select className="w-full rounded-lg border border-[var(--sidebar-border)] bg-white px-3 py-3 text-sm" required={question.required} value={String(value ?? '')} onChange={event => onChange(event.target.value)}>
           <option value="">Select an answer</option>
           {options.map(option => <option key={option} value={option}>{option}</option>)}
         </select>
@@ -116,7 +116,7 @@ const QuestionField: React.FC<{
           {options.map(option => {
             const selected = Array.isArray(value) && value.includes(option);
             return (
-              <label key={option} className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm ${selected ? 'border-[#0056A6] bg-[#EAF3FC]' : 'border-[#D9E4F0]'}`}>
+              <label key={option} className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm ${selected ? 'border-[var(--brand-primary)] bg-[var(--sidebar-active-bg)]' : 'border-[var(--sidebar-border)]'}`}>
                 <input type="checkbox" checked={selected} onChange={event => onChange(event.target.checked ? [...(Array.isArray(value) ? value : []), option] : (Array.isArray(value) ? value.filter(item => item !== option) : []))} />
                 <span>{option}</span>
               </label>
@@ -127,14 +127,14 @@ const QuestionField: React.FC<{
 
       {['short_text', 'paragraph', 'long_text', 'email', 'date', 'time', 'number'].includes(question.type) && (
         question.type === 'paragraph' || question.type === 'long_text'
-          ? <textarea rows={4} maxLength={10000} required={question.required} value={String(value ?? '')} onChange={event => onChange(event.target.value)} className="w-full rounded-lg border border-[#D9E4F0] px-3 py-3 text-sm focus:border-[#0056A6] focus:outline-none focus:ring-2 focus:ring-blue-100" />
+          ? <textarea rows={4} maxLength={10000} required={question.required} value={String(value ?? '')} onChange={event => onChange(event.target.value)} className="w-full rounded-lg border border-[var(--sidebar-border)] px-3 py-3 text-sm focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-blue-100" />
           : <input
               type={question.type === 'short_text' ? 'text' : question.type}
               maxLength={question.type === 'short_text' || question.type === 'email' ? 10000 : undefined}
               required={question.required}
               value={String(value ?? '')}
               onChange={event => onChange(question.type === 'number' ? (event.target.value === '' ? '' : Number(event.target.value)) : event.target.value)}
-              className="w-full rounded-lg border border-[#D9E4F0] px-3 py-3 text-sm focus:border-[#0056A6] focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-lg border border-[var(--sidebar-border)] px-3 py-3 text-sm focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
       )}
 
@@ -143,14 +143,14 @@ const QuestionField: React.FC<{
           {rows.map(row => {
             const rowValue = value && typeof value === 'object' ? (value as Record<string, unknown>)[row] : undefined;
             return (
-              <div key={row} className="rounded-lg border border-[#D9E4F0] p-3">
+              <div key={row} className="rounded-lg border border-[var(--sidebar-border)] p-3">
                 <p className="mb-2 text-sm font-medium text-slate-800">{row}</p>
                 <div className="flex flex-wrap gap-2">
                   {question.type === 'rubric_table'
                     ? Array.from({ length: (question.scaleMax ?? 5) - (question.scaleMin ?? 1) + 1 }, (_, index) => {
                         const score = (question.scaleMin ?? 1) + index;
                         const label = options[index] || String(score);
-                        return <label key={score} className="flex min-h-11 cursor-pointer items-center gap-2 rounded border border-[#D9E4F0] px-3 py-2 text-sm">
+                        return <label key={score} className="flex min-h-11 cursor-pointer items-center gap-2 rounded border border-[var(--sidebar-border)] px-3 py-2 text-sm">
                           <input type="radio" name={`${name}-${row}`} required={question.required} checked={Number(rowValue) === score} onChange={() => onChange({ ...(value as object || {}), [row]: score })} />
                           {label}
                         </label>;
@@ -159,7 +159,7 @@ const QuestionField: React.FC<{
                         const selected = question.type === 'multiple_choice_grid'
                           ? rowValue === option
                           : Array.isArray(rowValue) && rowValue.includes(option);
-                        return <label key={option} className="flex min-h-11 cursor-pointer items-center gap-2 rounded border border-[#D9E4F0] px-3 py-2 text-sm">
+                        return <label key={option} className="flex min-h-11 cursor-pointer items-center gap-2 rounded border border-[var(--sidebar-border)] px-3 py-2 text-sm">
                           <input
                             type={question.type === 'multiple_choice_grid' ? 'radio' : 'checkbox'}
                             name={`${name}-${row}`}
@@ -186,7 +186,7 @@ const QuestionField: React.FC<{
   );
 };
 
-export const PublicEvaluationView: React.FC<{ formId?: string }> = ({ formId }) => {
+export const PublicEvaluationView: React.FC<{ formId?: string; theme: WebsiteTheme }> = ({ formId, theme }) => {
   const [bundle, setBundle] = useState<PublicFormResponse | null>(null);
   const [forms, setForms] = useState<PublicFormListing[]>([]);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
@@ -277,92 +277,135 @@ export const PublicEvaluationView: React.FC<{ formId?: string }> = ({ formId }) 
   };
 
   return (
-    <main className="min-h-[100dvh] bg-[#F5F8FC] px-3 py-6 text-slate-800 sm:px-6 sm:py-10">
+    <main
+      className="min-h-[100dvh] px-3 py-6 text-slate-800 sm:px-6 sm:py-10"
+      style={{ backgroundColor: theme.pageBgColor }}
+    >
       <div className="mx-auto max-w-3xl">
-        <header className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-[#D9E4F0] bg-white px-4 py-4 shadow-sm sm:px-6">
+        <header
+          className="mb-5 flex items-center justify-between gap-3 rounded-xl border bg-white px-4 py-4 shadow-sm sm:px-6"
+          style={{
+            backgroundColor: theme.headerBackgroundColor || theme.headerBgColor,
+            color: theme.headerTextColor,
+            borderColor: theme.headerBorderColor,
+            fontFamily: theme.headerFontFamily,
+            fontSize: theme.headerFontSize
+          }}
+        >
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0056A6] text-white"><Building2 className="h-6 w-6" /></div>
+            <div
+              className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl text-white"
+              style={{ backgroundColor: theme.primaryColor, color: theme.sidebarLogoColor }}
+            >
+              {theme.sidebarLogoType === 'image' && theme.sidebarLogoUrl
+                ? <img src={theme.sidebarLogoUrl} alt="" className="h-full w-full object-contain" />
+                : <Building2 className="h-6 w-6" />}
+            </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-wide text-[#0056A6]">Southern Leyte State University</p>
-              <p className="text-sm font-semibold text-[#003366]">Hinunangan Campus · Extension Services</p>
+              <p className="truncate text-xs font-bold uppercase tracking-wide" style={{ color: theme.primaryColor }}>
+                {theme.headerTitle || theme.siteName}
+              </p>
+              <p className="truncate text-sm font-semibold" style={{ color: theme.headerTextColor }}>
+                {theme.headerSubtitle || theme.siteTagline}
+              </p>
             </div>
           </div>
-          <button type="button" onClick={goBack} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border border-[#D9E4F0] px-3 text-sm font-semibold text-[#003366] hover:bg-[#EAF3FC]">
+          <button
+            type="button"
+            onClick={goBack}
+            className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold"
+            style={{ borderColor: theme.sidebarBorderColor, color: theme.accentColor }}
+          >
             <ArrowLeft className="h-4 w-4" /><span className="hidden sm:inline">{submitted ? 'Back to evaluation' : formId ? 'All evaluations' : 'Back'}</span>
           </button>
         </header>
 
         {isLoading ? (
-          <section className="rounded-xl border border-[#D9E4F0] bg-white p-8 text-center"><LoaderCircle className="mx-auto h-6 w-6 animate-spin text-[#0056A6]" /><p className="mt-3 text-sm text-slate-600">Loading evaluation…</p></section>
+          <section className="rounded-xl border border-[var(--sidebar-border)] bg-white p-8 text-center"><LoaderCircle className="mx-auto h-6 w-6 animate-spin text-[var(--brand-primary)]" /><p className="mt-3 text-sm text-slate-600">Loading evaluation…</p></section>
         ) : error && !bundle ? (
           <section className="rounded-xl border border-rose-200 bg-white p-6 text-center">
             <p role="alert" className="text-sm text-rose-700">{error}</p>
-            <a href="/evaluate" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0056A6] px-4 text-sm font-semibold text-white">View available evaluations <ExternalLink className="h-4 w-4" /></a>
+            <a href="/evaluate" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white">View available evaluations <ExternalLink className="h-4 w-4" /></a>
           </section>
         ) : !formId ? (
           <section className="space-y-4">
-            <div className="rounded-xl border border-[#D9E4F0] bg-white p-5 shadow-sm sm:p-6">
-              <h1 className="text-xl font-bold text-[#003366]">Public Activity Evaluations</h1>
+            <div className="rounded-xl border border-[var(--sidebar-border)] bg-white p-5 shadow-sm sm:p-6">
+              <h1 className="text-xl font-bold text-[var(--brand-accent)]">Public Activity Evaluations</h1>
               <p className="mt-2 text-sm text-slate-600">Select an active extension activity to provide feedback. No account is needed.</p>
             </div>
-            {forms.length === 0 ? <p className="rounded-xl border border-[#D9E4F0] bg-white p-6 text-center text-sm text-slate-600">There are no active public evaluations right now.</p> : forms.map(form => (
-              <a key={form.id} href={`/evaluate/${encodeURIComponent(form.id)}`} className="block rounded-xl border border-[#D9E4F0] bg-white p-5 shadow-sm transition hover:border-[#0056A6] hover:bg-[#EAF3FC]">
-                <h2 className="font-bold text-[#003366]">{form.activityTitle}</h2>
+            {forms.length === 0 ? <p className="rounded-xl border border-[var(--sidebar-border)] bg-white p-6 text-center text-sm text-slate-600">There are no active public evaluations right now.</p> : forms.map(form => (
+              <a key={form.id} href={`/evaluate/${encodeURIComponent(form.id)}`} className="block rounded-xl border border-[var(--sidebar-border)] bg-white p-5 shadow-sm transition hover:border-[var(--brand-primary)] hover:bg-[var(--sidebar-active-bg)]">
+                <h2 className="font-bold text-[var(--brand-accent)]">{form.activityTitle}</h2>
                 <p className="mt-1 text-sm text-slate-700">{form.title}</p>
                 <p className="mt-2 text-xs text-slate-500">{form.activityDate} · {form.venue}</p>
               </a>
             ))}
           </section>
         ) : bundle && submitted ? (
-          <section className="rounded-xl border border-[#D9E4F0] bg-white p-8 text-center shadow-sm sm:p-12">
-            <CheckCircle2 className="mx-auto h-14 w-14 text-[#1976D2]" />
-            <h1 className="mt-4 text-2xl font-bold text-[#003366]">Thank you for your feedback</h1>
+          <section className="rounded-xl border border-[var(--sidebar-border)] bg-white p-8 text-center shadow-sm sm:p-12">
+            <CheckCircle2 className="mx-auto h-14 w-14 text-[var(--brand-secondary)]" />
+            <h1 className="mt-4 text-2xl font-bold text-[var(--brand-accent)]">Thank you for your feedback</h1>
             <p className="mx-auto mt-2 max-w-lg text-sm text-slate-600">Your evaluation for {bundle.activity.title} has been saved. Your responses help improve SLSU extension services.</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <button type="button" onClick={goBack} className="min-h-11 rounded-lg bg-[#0056A6] px-5 text-sm font-semibold text-white hover:bg-[#003366]">Return to evaluation</button>
-              <a href="/evaluate" className="inline-flex min-h-11 items-center rounded-lg border border-[#D9E4F0] px-5 text-sm font-semibold text-[#003366] hover:bg-[#EAF3FC]">Other active evaluations</a>
+              <button type="button" onClick={goBack} className="min-h-11 rounded-lg bg-[var(--brand-primary)] px-5 text-sm font-semibold text-white hover:bg-[var(--brand-accent)]">Return to evaluation</button>
+              <a href="/evaluate" className="inline-flex min-h-11 items-center rounded-lg border border-[var(--sidebar-border)] px-5 text-sm font-semibold text-[var(--brand-accent)] hover:bg-[var(--sidebar-active-bg)]">Other active evaluations</a>
             </div>
           </section>
         ) : bundle ? (
           <form onSubmit={event => void handleSubmit(event)} className="space-y-4">
-            <section className="rounded-xl border border-[#D9E4F0] bg-white p-5 shadow-sm sm:p-7">
-              <p className="text-xs font-bold uppercase tracking-wide text-[#1976D2]">Extension Activity Evaluation</p>
-              <h1 className="mt-2 text-2xl font-bold text-[#003366]">{bundle.activity.title}</h1>
+            <section className="rounded-xl border border-[var(--sidebar-border)] bg-white p-5 shadow-sm sm:p-7">
+              <p className="text-xs font-bold uppercase tracking-wide text-[var(--brand-secondary)]">Extension Activity Evaluation</p>
+              <h1 className="mt-2 text-2xl font-bold text-[var(--brand-accent)]">{bundle.activity.title}</h1>
               <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{bundle.activity.description}</p>
               <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600">
                 <span>{bundle.activity.date}</span><span>{bundle.activity.venue}</span>
               </div>
-              <div className="mt-6 border-t border-[#D9E4F0] pt-5">
-                <h2 className="text-lg font-bold text-[#003366]">{bundle.form.title}</h2>
+              <div className="mt-6 border-t border-[var(--sidebar-border)] pt-5">
+                <h2 className="text-lg font-bold text-[var(--brand-accent)]">{bundle.form.title}</h2>
                 <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{bundle.form.description}</p>
-                {bundle.form.instructions && <p className="mt-3 rounded-lg bg-[#EAF3FC] p-3 text-sm text-slate-700">{bundle.form.instructions}</p>}
+                {bundle.form.instructions && <p className="mt-3 rounded-lg bg-[var(--sidebar-active-bg)] p-3 text-sm text-slate-700">{bundle.form.instructions}</p>}
               </div>
             </section>
             {bundle.form.sections.map((section, sectionIndex) => (
-              <section key={section.id} className="space-y-5 rounded-xl border border-[#D9E4F0] bg-white p-5 shadow-sm sm:p-7">
-                <div><h2 className="font-bold text-[#003366]">{section.title || `Section ${sectionIndex + 1}`}</h2>{section.description && <p className="mt-1 text-sm text-slate-600">{section.description}</p>}</div>
+              <section key={section.id} className="space-y-5 rounded-xl border border-[var(--sidebar-border)] bg-white p-5 shadow-sm sm:p-7">
+                <div><h2 className="font-bold text-[var(--brand-accent)]">{section.title || `Section ${sectionIndex + 1}`}</h2>{section.description && <p className="mt-1 text-sm text-slate-600">{section.description}</p>}</div>
                 {section.questions.map((question, questionIndex) => (
                   <QuestionField key={question.id} question={question} number={questionIndex + 1} value={answers[question.id]} onChange={value => setAnswers(current => ({ ...current, [question.id]: value }))} />
                 ))}
               </section>
             ))}
-            <section className="space-y-4 rounded-xl border border-[#D9E4F0] bg-white p-5 shadow-sm sm:p-7">
-              <label className="block text-sm font-semibold text-[#003366]">Comments and suggestions <span className="font-normal text-slate-500">(optional)</span>
-                <textarea value={comments} onChange={event => setComments(event.target.value)} maxLength={5000} rows={4} className="mt-2 w-full rounded-lg border border-[#D9E4F0] px-3 py-3 text-sm focus:border-[#0056A6] focus:outline-none focus:ring-2 focus:ring-blue-100" placeholder="Share any additional feedback…" />
+            <section className="space-y-4 rounded-xl border border-[var(--sidebar-border)] bg-white p-5 shadow-sm sm:p-7">
+              <label className="block text-sm font-semibold text-[var(--brand-accent)]">Comments and suggestions <span className="font-normal text-slate-500">(optional)</span>
+                <textarea value={comments} onChange={event => setComments(event.target.value)} maxLength={5000} rows={4} className="mt-2 w-full rounded-lg border border-[var(--sidebar-border)] px-3 py-3 text-sm focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-blue-100" placeholder="Share any additional feedback…" />
               </label>
               <label className="flex items-start gap-3 text-sm text-slate-700">
-                <input type="checkbox" required checked={consentAccepted} onChange={event => setConsentAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-[#0056A6]" />
+                <input type="checkbox" required checked={consentAccepted} onChange={event => setConsentAccepted(event.target.checked)} className="mt-1 h-4 w-4 accent-[var(--brand-primary)]" />
                 <span>I agree that my anonymous responses may be used for evaluation, reporting, and improvement of this extension activity.</span>
               </label>
               {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-              <button type="submit" disabled={isSubmitting || !consentAccepted} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0056A6] px-5 text-sm font-bold text-white hover:bg-[#003366] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
+              <button type="submit" disabled={isSubmitting || !consentAccepted} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[var(--brand-primary)] px-5 text-sm font-bold text-white hover:bg-[var(--brand-accent)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
                 {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 {isSubmitting ? 'Submitting…' : 'Submit evaluation'}
               </button>
             </section>
           </form>
         ) : null}
-        <footer className="py-6 text-center text-xs text-slate-500">Southern Leyte State University · Hinunangan Campus</footer>
+        {theme.footerEnabled !== false && (
+          <footer
+            className="mt-6 rounded-xl border-t px-4 py-5 text-center"
+            style={{
+              backgroundColor: theme.footerBackgroundColor,
+              color: theme.footerTextColor,
+              borderColor: theme.footerBorderColor,
+              fontFamily: theme.footerFontFamily,
+              fontSize: theme.footerFontSize,
+              padding: theme.footerPadding
+            }}
+          >
+            <p className="font-semibold">{theme.footerTitle || theme.siteName}</p>
+            <p>{theme.footerSubtitle || theme.siteTagline}</p>
+          </footer>
+        )}
       </div>
     </main>
   );

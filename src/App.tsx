@@ -9,7 +9,7 @@ import { CapstoneAboutModal } from './components/CapstoneAboutModal';
 import { LoginModal } from './components/LoginModal';
 import { PublicEvaluationView } from './components/PublicEvaluationView';
 import { ToastContainer } from './components/ui/Toast';
-import { Building2, ShieldCheck, Award } from 'lucide-react';
+import { Building2, ShieldCheck, Award, LoaderCircle } from 'lucide-react';
 
 const normalizeContentBlocks = (blocks?: any[]) => {
   if (!Array.isArray(blocks)) return [];
@@ -100,7 +100,7 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#F5F8FC] text-slate-900 font-sans flex flex-col overflow-x-clip">
+    <div className="min-h-[100dvh] bg-[var(--bg-page)] text-slate-900 font-sans flex flex-col overflow-x-clip">
       {/* Fixed Desktop Sidebar & Mobile Drawer */}
       <Sidebar />
 
@@ -202,13 +202,60 @@ const MainLayout: React.FC = () => {
   );
 };
 
+const ApplicationConfigurationGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const {
+    isAuthLoading,
+    isConfigurationLoading,
+    configurationError,
+    refreshConfiguration
+  } = useApp();
+
+  if (isAuthLoading || isConfigurationLoading) {
+    return (
+      <main className="flex min-h-[100dvh] items-center justify-center bg-white text-slate-700">
+        <div className="flex items-center gap-3 text-sm">
+          <LoaderCircle className="h-5 w-5 animate-spin text-slate-500" />
+          {isAuthLoading ? 'Checking administrator session…' : 'Loading saved system configuration…'}
+        </div>
+      </main>
+    );
+  }
+
+  if (configurationError) {
+    return (
+      <main className="flex min-h-[100dvh] items-center justify-center bg-white px-4 text-slate-800">
+        <section className="max-w-md space-y-4 text-center">
+          <h1 className="text-xl font-semibold">Configuration unavailable</h1>
+          <p role="alert" className="text-sm text-slate-600">{configurationError}</p>
+          <button
+            type="button"
+            onClick={() => void refreshConfiguration()}
+            className="min-h-11 rounded-lg bg-slate-800 px-4 text-sm font-semibold text-white"
+          >
+            Retry loading configuration
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  return <>{children}</>;
+};
+
+const PublicEvaluationRoute: React.FC<{ formId?: string }> = ({ formId }) => {
+  const { theme } = useApp();
+  return <PublicEvaluationView formId={formId} theme={theme} />;
+};
+
 export default function App() {
   const publicEvaluationMatch = window.location.pathname.match(/^\/evaluate(?:\/([^/]+))?\/?$/);
   return (
     <AppProvider>
-      {publicEvaluationMatch
-        ? <PublicEvaluationView formId={publicEvaluationMatch[1] ? decodeURIComponent(publicEvaluationMatch[1]) : undefined} />
-        : <MainLayout />}
+      <ApplicationConfigurationGate>
+        {publicEvaluationMatch
+          ? <PublicEvaluationRoute formId={publicEvaluationMatch[1] ? decodeURIComponent(publicEvaluationMatch[1]) : undefined} />
+          : <MainLayout />}
+      </ApplicationConfigurationGate>
     </AppProvider>
   );
 }

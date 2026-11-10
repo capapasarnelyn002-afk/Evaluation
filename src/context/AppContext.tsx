@@ -126,6 +126,9 @@ interface AppContextType {
   role: UserRole;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
+  isConfigurationLoading: boolean;
+  configurationError: string;
+  refreshConfiguration: () => Promise<void>;
   loginError: string;
   clearLoginError: () => void;
   users: UserAccount[];
@@ -233,6 +236,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isConfigurationLoading, setIsConfigurationLoading] = useState(true);
+  const [configurationError, setConfigurationError] = useState('');
+  const configurationLoaded = React.useRef(false);
+  const configurationRequestId = React.useRef(0);
+  const themeVersion = React.useRef(0);
+  const systemSettingsVersion = React.useRef(0);
   const [loginError, setLoginError] = useState('');
 
   const role = currentUser.role;
@@ -367,7 +376,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   useEffect(() => {
-    applyThemeToDOM(theme);
+    if (configurationLoaded.current) applyThemeToDOM(theme);
   }, [theme]);
 
   useEffect(() => {
@@ -417,6 +426,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const data = await res.json();
         setCurrentUser(data.user);
         localStorage.setItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY, data.token);
+        configurationLoaded.current = false;
+        setConfigurationError('');
+        setIsConfigurationLoading(true);
         setIsAuthenticated(true);
         setCurrentView('overview');
         addToast({
@@ -499,6 +511,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     localStorage.removeItem(LOCAL_STORAGE_ACCESS_TOKEN_KEY);
+    configurationLoaded.current = false;
+    setConfigurationError('');
+    setIsConfigurationLoading(true);
     setCurrentUser({ id: '', name: '', email: '', role: 'participant', status: 'inactive' });
     setIsAuthenticated(false);
     setUsers([]);
@@ -805,13 +820,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
+  const refreshConfiguration = async () => {
+    const requestId = ++configurationRequestId.current;
+    const blockUntilLoaded = !configurationLoaded.current || (isAuthenticated && systemSettingsVersion.current === 0);
+    if (blockUntilLoaded) {
+      setIsConfigurationLoading(true);
+      setConfigurationError('');
+    }
+
+    try {
+      const [themeResponse, settingsResponse] = await Promise.all([
+        apiFetch('/api/public/config', { cache: 'no-store' }),
+        isAuthenticated
+          ? apiFetch('/api/settings', { cache: 'no-store' })
+          : Promise.resolve(null)
+      ]);
+      if (!themeResponse.ok) throw new Error(await getApiError(themeResponse, 'The saved website configuration could not be loaded.'));
+
+      const result = await themeResponse.json() as { theme?: unknown; version?: unknown };
+      if (
+        !result.theme ||
+        typeof result.theme !== 'object' ||
+        typeof (result.theme as WebsiteTheme).siteName !== 'string' ||
+        typeof (result.theme as WebsiteTheme).primaryColor !== 'string' ||
+        !Number.isSafeInteger(result.version)
+      ) {
+        throw new Error('The saved website configuration is invalid.');
+      }
+      const receivedThemeVersion = result.version as number;
+      if (receivedThemeVersion > themeVersion.current) {
+        const loadedTheme = result.theme as WebsiteTheme;
+        themeVersion.current = receivedThemeVersion;
+        setTheme(loadedTheme);
+        applyThemeToDOM(loadedTheme);
+      }
+
+      if (settingsResponse) {
+        if (!settingsResponse.ok) throw new Error(await getApiError(settingsResponse, 'Institutional settings could not be loaded.'));
+        const receivedSettingsVersion = Number(settingsResponse.headers.get('X-Configuration-Version'));
+        const loadedSettings = await settingsResponse.json() as SystemSettings;
+        if (!Number.isSafeInteger(receivedSettingsVersion) || !loadedSettings || typeof loadedSettings !== 'object') {
+          throw new Error('The saved institutional settings are invalid.');
+        }
+        if (receivedSettingsVersion > systemSettingsVersion.current) {
+          systemSettingsVersion.current = receivedSettingsVersion;
+          setSystemSettings(loadedSettings);
+        }
+      }
+
+      if (requestId === configurationRequestId.current) {
+        configurationLoaded.current = true;
+        setConfigurationError('');
+        setIsConfigurationLoading(false);
+      }
+    } catch (error) {
+      console.error('Failed to load the latest saved configuration:', error);
+      if (blockUntilLoaded && requestId === configurationRequestId.current) {
+        setConfigurationError(error instanceof Error ? error.message : 'The saved configuration could not be loaded.');
+      }
+    } finally {
+      if (blockUntilLoaded && requestId === configurationRequestId.current) setIsConfigurationLoading(false);
+    }
+  };
+
   // Website Theme Customization
   const updateTheme = async (newTheme: Partial<WebsiteTheme>, showToast = false): Promise<boolean> => {
     try {
       const merged = { ...theme, ...newTheme };
       const res = await apiFetch('/api/theme', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'If-Match': `"${themeVersion.current}"` },
         body: JSON.stringify(merged)
       });
       if (!res.ok) {
@@ -820,8 +898,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const savedTheme = await res.json() as WebsiteTheme;
-      setTheme(savedTheme);
-      applyThemeToDOM(savedTheme);
+      const savedVersion = Number(res.headers.get('X-Configuration-Version'));
+      if (!Number.isSafeInteger(savedVersion)) throw new Error('The database saved the appearance but returned an invalid version.');
+      if (savedVersion > themeVersion.current) {
+        themeVersion.current = savedVersion;
+        setTheme(savedTheme);
+        applyThemeToDOM(savedTheme);
+      }
       if (showToast) {
         addToast({
           type: 'success',
@@ -844,7 +927,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const resetTheme = async (): Promise<boolean> => {
     try {
       const res = await apiFetch('/api/theme/reset', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'If-Match': `"${themeVersion.current}"` }
       });
       if (!res.ok) {
         const errorBody = await res.json().catch(() => null);
@@ -852,8 +936,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const savedTheme = await res.json() as WebsiteTheme;
-      setTheme(savedTheme);
-      applyThemeToDOM(savedTheme);
+      const savedVersion = Number(res.headers.get('X-Configuration-Version'));
+      if (!Number.isSafeInteger(savedVersion)) throw new Error('The database saved the appearance but returned an invalid version.');
+      if (savedVersion > themeVersion.current) {
+        themeVersion.current = savedVersion;
+        setTheme(savedTheme);
+        applyThemeToDOM(savedTheme);
+      }
       addToast({
         type: 'success',
         title: 'Theme Reset to Default',
@@ -876,13 +965,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await apiFetch('/api/settings', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'If-Match': `"${systemSettingsVersion.current}"` },
         body: JSON.stringify(newSettings)
       });
       if (!res.ok) throw new Error(await getApiError(res, 'Could not save institutional settings.'));
 
       const data = await res.json();
-      setSystemSettings(data);
+      const savedVersion = Number(res.headers.get('X-Configuration-Version'));
+      if (!Number.isSafeInteger(savedVersion)) throw new Error('The database saved the settings but returned an invalid version.');
+      if (savedVersion > systemSettingsVersion.current) {
+        systemSettingsVersion.current = savedVersion;
+        setSystemSettings(data);
+      }
       addToast({
         type: 'success',
         title: 'Settings Saved',
@@ -921,8 +1015,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           apiFetch('/api/evaluations'),
           apiFetch('/api/forms'),
           apiFetch('/api/surveys'),
-          apiFetch('/api/theme'),
-          apiFetch('/api/settings')
+          refreshConfiguration()
         ]),
         role === 'admin'
           ? Promise.allSettled([
@@ -932,7 +1025,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ])
           : Promise.resolve([])
       ]);
-      const [actRes, evalRes, formsRes, surveysRes, themeRes, settingsRes] = commonResults;
+      const [actRes, evalRes, formsRes, surveysRes] = commonResults;
       const [metricsRes, usersRes, logsRes] = adminResults;
 
       if (actRes.status === 'fulfilled' && actRes.value.ok) {
@@ -948,11 +1041,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (surveysRes.status === 'fulfilled' && surveysRes.value.ok) {
         setSurveys(await surveysRes.value.json());
       }
-      if (themeRes.status === 'fulfilled' && themeRes.value.ok) {
-        const tData = await themeRes.value.json();
-        setTheme(tData);
-        applyThemeToDOM(tData);
-      }
       if (metricsRes?.status === 'fulfilled' && metricsRes.value.ok) {
         setSystemMetrics(await metricsRes.value.json());
       }
@@ -961,9 +1049,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       if (logsRes?.status === 'fulfilled' && logsRes.value.ok) {
         setAuditLogs(await logsRes.value.json());
-      }
-      if (settingsRes.status === 'fulfilled' && settingsRes.value.ok) {
-        setSystemSettings(await settingsRes.value.json());
       }
     } catch (err) {
       console.error('Failed to load application data from the database:', err);
@@ -1039,6 +1124,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (!active) return;
         setCurrentUser(result.user);
+        configurationLoaded.current = false;
+        setConfigurationError('');
+        setIsConfigurationLoading(true);
         setIsAuthenticated(true);
         setCurrentView('overview');
         setLoginError('');
@@ -1057,6 +1145,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isAuthLoading) void refreshConfiguration();
+  }, [isAuthLoading, isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) void refreshAllData();
@@ -1312,6 +1404,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         role,
         isAuthenticated,
         isAuthLoading,
+        isConfigurationLoading,
+        configurationError,
+        refreshConfiguration,
         loginError,
         clearLoginError: () => setLoginError(''),
         users,

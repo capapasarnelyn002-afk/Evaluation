@@ -4,5 +4,11 @@ export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  return fetch(input, { ...init, headers });
+  const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+  const isApiRequest = requestUrl.startsWith('/api/');
+  return fetch(input, {
+    ...init,
+    ...(isApiRequest ? { cache: 'no-store' as RequestCache } : {}),
+    headers
+  });
 }

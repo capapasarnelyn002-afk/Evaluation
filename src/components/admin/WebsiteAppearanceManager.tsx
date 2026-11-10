@@ -368,6 +368,7 @@ export const WebsiteAppearanceManager: React.FC = () => {
     ...theme,
     typography: theme.typography || { ...DEFAULT_TYPOGRAPHY_CONFIG }
   });
+  const lastSavedTheme = useRef(theme);
   const [selectedPreset, setSelectedPreset] = useState<string>('slsu-official');
   const [isSaving, setIsSaving] = useState(false);
   const [previewSidebarCollapsed, setPreviewSidebarCollapsed] = useState(false);
@@ -386,10 +387,14 @@ export const WebsiteAppearanceManager: React.FC = () => {
 
   // Sync state if external theme changes
   useEffect(() => {
-    setFormTheme({
-      ...theme,
-      typography: theme.typography || { ...DEFAULT_TYPOGRAPHY_CONFIG }
-    });
+    const hasUnsavedChanges = JSON.stringify(formTheme) !== JSON.stringify(lastSavedTheme.current);
+    lastSavedTheme.current = theme;
+    if (!hasUnsavedChanges) {
+      setFormTheme({
+        ...theme,
+        typography: theme.typography || { ...DEFAULT_TYPOGRAPHY_CONFIG }
+      });
+    }
   }, [theme]);
 
   const currentTypo = formTheme.typography || DEFAULT_TYPOGRAPHY_CONFIG;
