@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Survey, SurveyQuestion, SurveyResponse } from '../../types';
 import { apiFetch } from '../../utils/api';
+import { createSystemTestingSurveyTemplate } from '../../data/systemTestingSurvey';
 import { 
   ClipboardList, 
   Plus, 
@@ -126,6 +127,21 @@ export const AdminSurveyManager: React.FC = () => {
     setShowModal(true);
   };
 
+  const openSystemTestingTemplate = () => {
+    const template = createSystemTestingSurveyTemplate();
+    setEditingSurvey(null);
+    setFormTitle(template.title);
+    setFormDescription(template.description);
+    setFormInstructions(template.instructions);
+    setFormStatus('draft');
+    setFormAudience(template.targetAudience);
+    setFormIsAnonymous(template.isAnonymous);
+    setFormStartDate(new Date().toISOString().split('T')[0]);
+    setFormEndDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
+    setQuestions(template.questions);
+    setShowModal(true);
+  };
+
   const openEditModal = (survey: Survey) => {
     setEditingSurvey(survey);
     setFormTitle(survey.title);
@@ -245,13 +261,22 @@ export const AdminSurveyManager: React.FC = () => {
             Create, deploy, and monitor institutional outreach questionnaires for Southern Leyte State University communities.
           </p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="px-4 py-2.5 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Create New Survey</span>
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+          <button
+            onClick={openSystemTestingTemplate}
+            className="px-4 py-2.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <ClipboardList className="w-4 h-4" />
+            <span>Use System Testing Template</span>
+          </button>
+          <button
+            onClick={openCreateModal}
+            className="px-4 py-2.5 rounded-lg bg-blue-900 hover:bg-blue-950 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create New Survey</span>
+          </button>
+        </div>
       </div>
 
       {/* Metrics Summary Strip */}

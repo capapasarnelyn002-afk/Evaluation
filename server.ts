@@ -2435,7 +2435,7 @@ function restoreServerState(saved: unknown) {
   restoreArray(users, state.users, 'users');
   restoreArray(activities, state.activities, 'activities');
   activities.forEach(activity => {
-    if (!['online', 'offline'].includes(activity.surveyMode)) {
+    if (!['online', 'offline'].includes(activity.surveyMode ?? '')) {
       activity.surveyMode = 'online';
     }
   });
