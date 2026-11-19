@@ -115,7 +115,7 @@ export const ParticipantEvaluationView: React.FC = () => {
   const [participantEmail, setParticipantEmail] = useState('');
   const [participantPhone, setParticipantPhone] = useState('');
   const [participantCategory, setParticipantCategory] = useState<string>('farmer_fisherfolk');
-  const [verificationMethod, setVerificationMethod] = useState<'student_id' | 'qr_code' | 'sms_code' | 'signed_attendance'>('student_id');
+  const [verificationMethod, setVerificationMethod] = useState<'student_id' | 'sms_code' | 'signed_attendance'>('student_id');
   const [verificationCode, setVerificationCode] = useState('');
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [customAnswers, setCustomAnswers] = useState<Record<string, string | number | string[] | Record<string, string | number>>>({});
@@ -410,7 +410,6 @@ export const ParticipantEvaluationView: React.FC = () => {
                 className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-700"
               >
                 <option value="student_id">SLSU ID / Student or Employee ID</option>
-                <option value="qr_code">Attendance QR Verification</option>
                 <option value="signed_attendance">Signed Physical Attendance Sheet</option>
                 <option value="sms_code">Barangay Resident ID / Government ID</option>
               </select>

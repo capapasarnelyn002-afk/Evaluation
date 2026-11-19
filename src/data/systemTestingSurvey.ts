@@ -55,7 +55,7 @@ export const createSystemTestingSurveyTemplate = (): SystemTestingSurveyTemplate
     },
     {
       id: `testing-link-${Date.now()}-7`,
-      title: 'The public link or QR code opens the correct evaluation form.',
+      title: 'The public link opens the correct evaluation form.',
       type: 'rating_scale',
       required: true
     },

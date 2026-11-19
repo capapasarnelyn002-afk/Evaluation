@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { validatePublicAnswers } from '../../server.ts';
-import { makeEvaluationQrDataUrl } from '../components/PublicEvaluationView.tsx';
 
 const form = {
   sections: [{
@@ -49,7 +48,3 @@ test('rejects malformed free-text and email responses', () => {
   assert.match(validatePublicAnswers(textForm, { email: 'person@example.edu', text: 'x'.repeat(10001) }) || '', /Text/);
 });
 
-test('generates a local QR code image for the public form URL', async () => {
-  const image = await makeEvaluationQrDataUrl('https://example.test/evaluate/form-123');
-  assert.match(image, /^data:image\/png;base64,/);
-});

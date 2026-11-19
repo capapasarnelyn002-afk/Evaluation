@@ -171,6 +171,8 @@ create index if not exists evaluations_activity_id_idx on public.evaluations ("a
 create index if not exists evaluations_participant_email_idx on public.evaluations (lower("participantEmail"));
 create index if not exists survey_responses_survey_id_idx on public.survey_responses ("surveyId");
 create index if not exists audit_logs_timestamp_idx on public.audit_logs (timestamp desc);
+create unique index if not exists evaluations_control_number_uidx
+  on public.evaluations ("controlNumber");
 
 alter table public.users enable row level security;
 alter table public.activities enable row level security;
@@ -416,55 +418,75 @@ security definer
 set search_path = ''
 as $$
 begin
-  delete from public.survey_responses;
-  delete from public.evaluations;
-  delete from public.audit_logs;
-  delete from public.surveys;
-  delete from public.evaluation_forms;
-  delete from public.activities;
-  delete from public.users;
-
+  perform pg_advisory_xact_lock(730003);
   insert into public.users
-  select r.* from jsonb_populate_recordset(
-    null::public.users,
-    coalesce(p_snapshot->'users', '[]'::jsonb)
-  ) as r;
+  select r.* from jsonb_populate_recordset(null::public.users, coalesce(p_snapshot->'users', '[]'::jsonb)) r
+  on conflict (id) do update set
+    name=excluded.name, email=excluded.email, role=excluded.role,
+    department=excluded.department, title=excluded.title, status=excluded.status,
+    "lastLogin"=excluded."lastLogin", "createdAt"=excluded."createdAt",
+    __position=excluded.__position;
 
   insert into public.activities
-  select r.* from jsonb_populate_recordset(
-    null::public.activities,
-    coalesce(p_snapshot->'activities', '[]'::jsonb)
-  ) as r;
+  select r.* from jsonb_populate_recordset(null::public.activities, coalesce(p_snapshot->'activities', '[]'::jsonb)) r
+  on conflict (id) do update set
+    title=excluded.title, "activityType"=excluded."activityType", description=excluded.description,
+    instructions=excluded.instructions, date=excluded.date, "startDate"=excluded."startDate",
+    deadline=excluded.deadline, venue=excluded.venue, "targetBeneficiaries"=excluded."targetBeneficiaries",
+    "organizingDepartment"=excluded."organizingDepartment", "leadCoordinator"=excluded."leadCoordinator",
+    "trainerOrSpeaker"=excluded."trainerOrSpeaker", status=excluded.status,
+    "surveyMode"=excluded."surveyMode", "totalTargetParticipants"=excluded."totalTargetParticipants",
+    "assignedFormId"=excluded."assignedFormId", "createdAt"=excluded."createdAt", __position=excluded.__position;
 
   insert into public.evaluation_forms
-  select r.* from jsonb_populate_recordset(
-    null::public.evaluation_forms,
-    coalesce(p_snapshot->'evaluationForms', '[]'::jsonb)
-  ) as r;
+  select r.* from jsonb_populate_recordset(null::public.evaluation_forms, coalesce(p_snapshot->'evaluationForms', '[]'::jsonb)) r
+  on conflict (id) do update set
+    title=excluded.title, description=excluded.description, instructions=excluded.instructions,
+    status=excluded.status, "publicEnabled"=excluded."publicEnabled", "expiresAt"=excluded."expiresAt",
+    version=excluded.version, "targetActivityType"=excluded."targetActivityType",
+    "activityId"=excluded."activityId", "targetRespondent"=excluded."targetRespondent",
+    purpose=excluded.purpose, "originalFileName"=excluded."originalFileName",
+    sections=excluded.sections, "createdAt"=excluded."createdAt", "updatedAt"=excluded."updatedAt",
+    __position=excluded.__position;
 
   insert into public.evaluations
-  select r.* from jsonb_populate_recordset(
-    null::public.evaluations,
-    coalesce(p_snapshot->'evaluations', '[]'::jsonb)
-  ) as r;
+  select r.* from jsonb_populate_recordset(null::public.evaluations, coalesce(p_snapshot->'evaluations', '[]'::jsonb)) r
+  on conflict (id) do update set
+    "activityId"=excluded."activityId", "formId"=excluded."formId",
+    "formSnapshot"=excluded."formSnapshot", "customAnswers"=excluded."customAnswers",
+    "participantName"=excluded."participantName", "participantEmail"=excluded."participantEmail",
+    "participantPhone"=excluded."participantPhone", "participantCategory"=excluded."participantCategory",
+    "controlNumber"=excluded."controlNumber", "verificationMethod"=excluded."verificationMethod",
+    "coreRatings"=excluded."coreRatings", "specificRatings"=excluded."specificRatings",
+    "meanRating"=excluded."meanRating", comments=excluded.comments, sentiment=excluded.sentiment,
+    "submissionSource"=excluded."submissionSource", "submittedAt"=excluded."submittedAt",
+    "syncedAt"=excluded."syncedAt", "deviceInfo"=excluded."deviceInfo", verified=excluded.verified,
+    "consentAccepted"=excluded."consentAccepted", "adminFollowUpStatus"=excluded."adminFollowUpStatus",
+    "adminNotes"=excluded."adminNotes", __position=excluded.__position;
 
   insert into public.audit_logs
-  select r.* from jsonb_populate_recordset(
-    null::public.audit_logs,
-    coalesce(p_snapshot->'auditLogs', '[]'::jsonb)
-  ) as r;
+  select r.* from jsonb_populate_recordset(null::public.audit_logs, coalesce(p_snapshot->'auditLogs', '[]'::jsonb)) r
+  on conflict (id) do update set
+    timestamp=excluded.timestamp, "adminName"=excluded."adminName", action=excluded.action,
+    "resourceId"=excluded."resourceId", "participantControlNumber"=excluded."participantControlNumber",
+    reason=excluded.reason, "ipAddress"=excluded."ipAddress", status=excluded.status,
+    __position=excluded.__position;
 
   insert into public.surveys
-  select r.* from jsonb_populate_recordset(
-    null::public.surveys,
-    coalesce(p_snapshot->'surveys', '[]'::jsonb)
-  ) as r;
+  select r.* from jsonb_populate_recordset(null::public.surveys, coalesce(p_snapshot->'surveys', '[]'::jsonb)) r
+  on conflict (id) do update set
+    title=excluded.title, description=excluded.description, instructions=excluded.instructions,
+    status=excluded.status, "isAnonymous"=excluded."isAnonymous",
+    "targetAudience"=excluded."targetAudience", "startDate"=excluded."startDate",
+    "endDate"=excluded."endDate", questions=excluded.questions,
+    "createdAt"=excluded."createdAt", __position=excluded.__position;
 
   insert into public.survey_responses
-  select r.* from jsonb_populate_recordset(
-    null::public.survey_responses,
-    coalesce(p_snapshot->'surveyResponses', '[]'::jsonb)
-  ) as r;
+  select r.* from jsonb_populate_recordset(null::public.survey_responses, coalesce(p_snapshot->'surveyResponses', '[]'::jsonb)) r
+  on conflict (id) do update set
+    "surveyId"=excluded."surveyId", "respondentName"=excluded."respondentName",
+    "respondentEmail"=excluded."respondentEmail", "isAnonymous"=excluded."isAnonymous",
+    answers=excluded.answers, "submittedAt"=excluded."submittedAt", __position=excluded.__position;
 
   -- Configuration has its own versioned save RPCs; snapshots must never overwrite it.
 end;

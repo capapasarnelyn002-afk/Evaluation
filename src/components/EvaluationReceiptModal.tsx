@@ -3,7 +3,6 @@ import { EvaluationSubmission, Activity } from '../types';
 import { 
   Printer, 
   X, 
-  QrCode, 
   ShieldCheck, 
   FileCheck2,
   Copy,
@@ -146,10 +145,10 @@ export const EvaluationReceiptModal: React.FC<Props> = ({ evaluation, activity, 
                 </p>
               </div>
 
-              {/* QR validation representation */}
+              {/* Verification mark */}
               <div className="flex flex-col items-center">
                 <div className="w-14 h-14 bg-slate-900 rounded p-1 flex items-center justify-center text-white shadow-xs">
-                  <QrCode className="w-12 h-12 text-white" />
+                  <ShieldCheck className="w-12 h-12 text-white" />
                 </div>
                 <span className="text-[9px] text-blue-900 font-bold mt-1">VERIFIED VALID</span>
               </div>

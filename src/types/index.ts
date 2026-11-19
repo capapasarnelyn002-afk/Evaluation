@@ -59,7 +59,7 @@ export interface EvaluationSubmission {
   participantPhone?: string;
   participantCategory: ParticipantCategory;
   controlNumber: string;
-  verificationMethod: 'student_id' | 'qr_code' | 'sms_code' | 'signed_attendance' | 'offline_form' | 'public_link';
+  verificationMethod: 'student_id' | 'sms_code' | 'signed_attendance' | 'offline_form' | 'public_link';
   coreRatings: {
     satisfaction: number;
     objectives: number;

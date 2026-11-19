@@ -3,7 +3,6 @@ import { useApp } from '../../context/AppContext';
 import { EvaluationForm, FormSection, FormQuestion, QuestionType } from '../../types';
 import { EvaluationPrintDocument, startEvaluationPrint } from '../EvaluationPrintDocument';
 import { EvaluationXlsxImportModal } from './EvaluationXlsxImportModal';
-import { makeEvaluationQrDataUrl } from '../PublicEvaluationView';
 import { 
   Plus, 
   Trash2, 
@@ -42,7 +41,6 @@ export const EvaluationFormBuilder: React.FC = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [printForm, setPrintForm] = useState<EvaluationForm | null>(null);
   const [printPaper, setPrintPaper] = useState<'A4' | 'Letter'>('A4');
-  const [qrDataUrl, setQrDataUrl] = useState('');
   const [publicLinkCopied, setPublicLinkCopied] = useState(false);
 
   useEffect(() => {
@@ -101,21 +99,6 @@ export const EvaluationFormBuilder: React.FC = () => {
       });
     }
   };
-
-  useEffect(() => {
-    let active = true;
-    if (!currentForm || currentForm.status !== 'published' || currentForm.publicEnabled === false || isCreatingNewForm) {
-      setQrDataUrl('');
-      return;
-    }
-    void makeEvaluationQrDataUrl(`${window.location.origin}/evaluate/${encodeURIComponent(currentForm.id)}`)
-      .then(dataUrl => { if (active) setQrDataUrl(dataUrl); })
-      .catch(error => {
-        console.error('Could not generate the evaluation QR code:', error);
-        if (active) setQrDataUrl('');
-      });
-    return () => { active = false; };
-  }, [currentForm?.id, currentForm?.status, currentForm?.publicEnabled, isCreatingNewForm]);
 
   useEffect(() => {
     if (!editingForm && !activeFormId && forms.length > 0) setActiveFormId(forms[0].id);
@@ -744,7 +727,7 @@ export const EvaluationFormBuilder: React.FC = () => {
             <section className="grid gap-4 rounded-xl border border-[#D9E4F0] bg-[#F5F8FC] p-4 sm:grid-cols-[1fr_auto] sm:items-center">
               <div className="min-w-0">
                 <h3 className="font-bold text-[#003366]">Public evaluation link</h3>
-                <p className="mt-1 text-xs text-slate-600">Share this link or its QR code with participants. No participant account is required.</p>
+                <p className="mt-1 text-xs text-slate-600">Share this link with participants. No participant account is required.</p>
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                   <input aria-label="Public evaluation link" readOnly value={publicLink} className="min-w-0 flex-1 rounded-lg border border-[#D9E4F0] bg-white px-3 py-2 text-xs text-slate-700" />
                   <button type="button" onClick={() => void handleCopyPublicLink()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#0056A6] px-3 text-xs font-bold text-white hover:bg-[#003366]">
@@ -756,12 +739,7 @@ export const EvaluationFormBuilder: React.FC = () => {
                   {currentForm.publicEnabled === false && <span className="ml-2 font-semibold text-rose-700">Public submissions disabled</span>}
                 </p>
               </div>
-              <div className="flex flex-col items-center gap-2">
-                {qrDataUrl && currentForm.publicEnabled !== false
-                  ? <img src={qrDataUrl} alt={`QR code for ${currentForm.title}`} className="h-36 w-36 rounded-lg border border-[#D9E4F0] bg-white p-2" />
-                  : <div className="flex h-36 w-36 items-center justify-center rounded-lg border border-dashed border-[#D9E4F0] bg-white px-3 text-center text-xs text-slate-500">Enable submissions to generate a QR code.</div>}
-                <a href={publicLink} target="_blank" rel="noreferrer" className="text-xs font-semibold text-[#0056A6] underline">Preview public form</a>
-              </div>
+              <a href={publicLink} target="_blank" rel="noreferrer" className="text-xs font-semibold text-[#0056A6] underline sm:self-center">Preview public form</a>
             </section>
           )}
 

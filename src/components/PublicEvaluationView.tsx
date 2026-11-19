@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import QRCode from 'qrcode';
 import { ArrowLeft, CheckCircle2, ExternalLink, LoaderCircle, Send } from 'lucide-react';
 import { FormQuestion, WebsiteTheme } from '../types';
 import { UniversityLogo } from './UniversityLogo';
@@ -406,11 +405,3 @@ export const PublicEvaluationView: React.FC<{ formId?: string; theme: WebsiteThe
   );
 };
 
-export async function makeEvaluationQrDataUrl(publicUrl: string) {
-  return QRCode.toDataURL(publicUrl, {
-    errorCorrectionLevel: 'M',
-    margin: 2,
-    width: 256,
-    color: { dark: '#003366', light: '#FFFFFF' }
-  });
-}

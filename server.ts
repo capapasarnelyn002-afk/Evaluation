@@ -1811,7 +1811,11 @@ app.delete('/api/forms/:id', (req, res) => {
     res.status(404).json({ error: 'Form not found' });
     return;
   }
-  const deleted = evaluationForms.splice(idx, 1)[0];
+  const deleted = evaluationForms[idx];
+  deleted.status = 'archived';
+  deleted.publicEnabled = false;
+  deleted.updatedAt = new Date().toISOString();
+  deleted.version = (deleted.version || 1) + 1;
   activities.forEach(activity => {
     if (activity.assignedFormId === deleted.id) activity.assignedFormId = undefined;
   });
@@ -2277,7 +2281,8 @@ app.delete('/api/activities/:id', (req, res) => {
     res.status(404).json({ error: 'Activity not found' });
     return;
   }
-  const deleted = activities.splice(idx, 1)[0];
+  const deleted = activities[idx];
+  deleted.status = 'archived';
   auditLogs.unshift({
     id: `log-${Date.now()}`,
     timestamp: new Date().toISOString(),

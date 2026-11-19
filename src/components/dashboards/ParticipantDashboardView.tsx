@@ -177,7 +177,7 @@ export const ParticipantDashboardView: React.FC = () => {
               <div>
                 <h3 className="font-bold text-base text-slate-900">My Completed Evaluation Receipts & Certificates</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Official certificates of attendance verified under Republic Act No. 10173 with QR codes.
+                  Official certificates of attendance verified under Republic Act No. 10173.
                 </p>
               </div>
               <button
@@ -371,7 +371,7 @@ export const ParticipantDashboardView: React.FC = () => {
                 </div>
                 <h4 className="font-bold text-sm text-slate-900 mb-1">My Certificates</h4>
                 <p className="text-xs text-slate-500 mb-4">
-                  Download and print verified certificates of completion with QR codes.
+                  Download and print verified certificates of completion.
                 </p>
                 <span className="text-xs font-bold text-amber-800 flex items-center gap-1">
                   <span>View Certificates</span>

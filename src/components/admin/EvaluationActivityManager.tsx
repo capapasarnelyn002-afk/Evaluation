@@ -586,7 +586,7 @@ export const EvaluationActivityManager: React.FC = () => {
                   rows={2}
                   value={formInstructions}
                   onChange={(e) => setFormInstructions(e.target.value)}
-                  placeholder="e.g. Please bring your QR attendee code or student ID to verify attendance."
+                  placeholder="e.g. Please bring your student ID or signed attendance form for verification."
                   className="w-full border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900"
                 />
               </div>
